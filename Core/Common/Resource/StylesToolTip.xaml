@@ -1,0 +1,41 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Style x:Key="HelpTooltip" TargetType="ToolTip">
+    <Setter Property="OverridesDefaultStyle" Value="true" />
+    <Setter Property="HasDropShadow" Value="True" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ToolTip">
+          <Border Name="Border" CornerRadius="5"
+                BorderThickness="1"
+                Width="{TemplateBinding Width}"
+                Height="{TemplateBinding Height}">
+            <ContentPresenter Margin="4" HorizontalAlignment="Left" VerticalAlignment="Top" />
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+    <Setter Property="Content">
+      <Setter.Value>
+        <ItemsControl ItemsSource="{Binding Path=(Validation.Errors)}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <TextBlock Text="{Binding ErrorContent.ValidationMessage}" VerticalAlignment="Center"/>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <ToolTip x:Key="ErrorRepository" Style="{StaticResource HelpTooltip}" />
+
+  <Style TargetType="{x:Type TextBox}">
+    <Style.Triggers>
+      <Trigger Property="Validation.HasError" Value="True">
+        <Setter Property="ToolTip" Value="{StaticResource HelpTooltip}" />
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+</ResourceDictionary>

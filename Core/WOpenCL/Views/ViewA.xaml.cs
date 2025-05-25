@@ -13,16 +13,16 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 
-namespace Common.Views
+namespace WOpenCL.Views
 {
-    /// <summary>
-    /// Interaction logic for ViewA.xaml
-    /// </summary>
-    public partial class ViewA : UserControl
+  /// <summary>
+  /// Interaction logic for ViewA.xaml
+  /// </summary>
+  public partial class ViewA : UserControl
+  {
+    public ViewA()
     {
-        public ViewA()
-        {
-            InitializeComponent();
-        }
+      InitializeComponent();
     }
+  }
 }

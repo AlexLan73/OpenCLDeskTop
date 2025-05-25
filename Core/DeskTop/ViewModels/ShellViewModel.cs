@@ -7,7 +7,7 @@ namespace DeskTop.ViewModels;
 public class ShellViewModel : BindableBase
 {
     private Shell _shell;
-    private string _title = "__ TEST OpenCL __";
+    private string _title = "___ TEST OpenCL ___";
     public string Title
     {
         get => _title;

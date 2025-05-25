@@ -1,0 +1,64 @@
+﻿<mah:MetroWindow  x:Class="Logger.Views.WinError"
+                  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                  xmlns:prism="http://prismlibrary.com/" xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                  xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
+                  mc:Ignorable="d"
+                  prism:ViewModelLocator.AutoWireViewModel="True"
+                  d:DataContext="{d:DesignData }" Width="600"
+                  Title="Журнал сообщений и ошибок." >
+  <DockPanel>
+    <DockPanel Dock="Top" VerticalAlignment="Top" > 
+      <TextBlock Text="{Binding Name}" FontSize="22"
+                 HorizontalAlignment="Center"
+                 VerticalAlignment="Center"/>
+    </DockPanel>
+    <StatusBar DockPanel.Dock="Bottom"  VerticalAlignment="Bottom">
+      <StatusBarItem>
+        <TextBlock Text="{Binding StatusStr}" FontSize="15"
+                 HorizontalAlignment="Left"
+                 VerticalAlignment="Center"/>
+      </StatusBarItem>
+    </StatusBar>
+    <Expander DockPanel.Dock="Right"
+              HorizontalAlignment="Right"
+              ExpandDirection="Right">
+      <Expander.Header>
+        <TextBlock Text="Фильтр" Foreground="White"> 
+          <TextBlock.LayoutTransform>
+            <RotateTransform Angle="90"/>
+          </TextBlock.LayoutTransform>
+        </TextBlock>
+      </Expander.Header>
+      <Border BorderBrush="Navy" BorderThickness="1,3,1,5">
+        <Border.Background>
+          <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
+            <GradientStop Color="LightCyan" Offset="0.0" />
+            <GradientStop Color="LightBlue" Offset="0.5" />
+            <GradientStop Color="DodgerBlue" Offset="1.0" />
+          </LinearGradientBrush>
+        </Border.Background>
+        <TextBlock Text="!-1k1k1k1k1k1k1k1k1k!-!-" />
+      </Border>
+    </Expander>
+
+    <DataGrid x:Name="DgError" ItemsSource="{Binding LsError}" Margin="3"
+                FontSize="12"
+                VerticalAlignment="Top"
+                AutoGenerateColumns="False" 
+              ScrollViewer.VerticalScrollBarVisibility="Auto" >
+      
+      <DataGrid.Columns>
+        <DataGridTextColumn Binding="{Binding SDateTime}" Header="Дата время" IsReadOnly="True"/>
+        <DataGridTextColumn Binding="{Binding LoggerSendEnum}" Header="Тип сообщения" IsReadOnly="True"/>
+        <DataGridTextColumn Binding="{Binding Module}" Header="Модуль" IsReadOnly="True"/>
+        <DataGridTextColumn Binding="{Binding Send}" Header="Сообщение" IsReadOnly="False"/>
+      </DataGrid.Columns>
+    </DataGrid>
+    
+  </DockPanel>
+</mah:MetroWindow>
+
+  
+  
