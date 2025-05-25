@@ -22,4 +22,8 @@
     <ProjectReference Include="..\Modules\Modules.csproj" />
     <ProjectReference Include="..\WOpenCL\WOpenCL.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Views\NPORD.png" />
+  </ItemGroup>
+
 </Project>

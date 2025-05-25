@@ -7,14 +7,271 @@
                  xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
                  xmlns:mah="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"        
                  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                 xmlns:constants="clr-namespace:Common.Static;assembly=Common"
                  GlowBrush="{DynamicResource MahApps.Brushes.Accent4}"                 
                  mc:Ignorable="d"
                  Title="{Binding Title}" Height="1000" Width="1600" 
                  WindowStartupLocation="CenterScreen"
                   >
-    <Grid>
-        <ContentControl prism:RegionManager.RegionName="ContentRegion" />
-    </Grid>
+  <Window.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="pack://application:,,,/Common;component/Resource/Styles0.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/Common;component/Resource/StylesToolTip.xaml" />
+      </ResourceDictionary.MergedDictionaries>
+
+      <Style TargetType="iconPacks:PackIconModern" x:Key="HwIconModern">
+        <Setter Property="Height" Value="22"/>
+        <Setter Property="Width" Value="22"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+      </Style>
+      <Style TargetType="mah:Flyout" x:Key="VbFlyout">
+        <Setter Property="Background" Value="Black"/>
+        <Setter Property="VerticalAlignment" Value="Top"/>
+      </Style>
+      <Style TargetType="Button">
+        <Style.Resources>
+          <Style TargetType="Border">
+            <Setter Property="CornerRadius" Value="5"/>
+          </Style>
+        </Style.Resources>
+      </Style>
+
+    </ResourceDictionary>
+  </Window.Resources>
+  <!--#region Правое горизонтальное меню -->
+  <mah:MetroWindow.RightWindowCommands>
+    <mah:WindowCommands  >
+      <StackPanel Orientation="Horizontal">
+        <Button x:Name="BtWinError" CommandParameter="Journal"
+          Command="{Binding CommandNavigate}">
+          <Button.ToolTip>
+            <ToolTip Style="{StaticResource HelpTooltip}">
+              <Border Style="{StaticResource Border2}">
+                <TextBlock Text="Журнал с логами" Margin="20, 0, 10, 0" FontSize="16" Foreground="White"/>
+              </Border>
+            </ToolTip>
+          </Button.ToolTip>
+          <iconPacks:BoxIcons Height="22" Width="22" Kind="RegularError"/>
+        </Button>
+        <Button CommandParameter="setup" 
+          Command="{Binding CommandNavigate}">
+          <Button.ToolTip>
+            <ToolTip Style="{StaticResource HelpTooltip}">
+              <Border Style="{StaticResource Border2}">
+                <TextBlock Text="Установки" Margin="20, 0, 10, 0" FontSize="16" Foreground="White"/>
+              </Border>
+            </ToolTip>
+          </Button.ToolTip>
+
+          <iconPacks:PackIconModern  Style="{StaticResource HwIconModern}" Kind="Settings" />
+        </Button>
+      </StackPanel>
+    </mah:WindowCommands>
+  </mah:MetroWindow.RightWindowCommands>
+  <!--#endregion-->
+
+  <!--#region Левая горизонтальное меню -->
+  <mah:MetroWindow.LeftWindowCommands>
+    <mah:WindowCommands>
+      <StackPanel Orientation="Horizontal">
+        <Button Margin="20, 0, 00, 0" CommandParameter="goto0" 
+            Command="{Binding CommandNavigate}">
+          <Button.ToolTip>
+            <ToolTip Style="{StaticResource HelpTooltip}">
+              <Border Style="{StaticResource Border2}">
+                <TextBlock Text="Открываем меню с тестами" Margin="3" FontSize="16" Foreground="White"/>
+              </Border>
+            </ToolTip>
+          </Button.ToolTip>
+
+          <iconPacks:PackIconModern  Margin="0, 0, 0, 0"
+            Style="{StaticResource HwIconModern}"
+            Kind="SectionExpand"/>
+        </Button>
+
+        <Button Margin="20, 0, 00, 0" CommandParameter="goto1"
+            Command="{Binding CommandNavigate}">
+          <Button.ToolTip>
+            <ToolTip Style="{StaticResource HelpTooltip}">
+              <Border Style="{StaticResource Border2}">
+                <TextBlock Text="Вызов 1" Margin="3" FontSize="16" Foreground="White"/>
+              </Border>
+            </ToolTip>
+          </Button.ToolTip>
+          <iconPacks:PackIconModern  Margin="0, 0, 0, 0"
+            Style="{StaticResource HwIconModern}"
+            Kind="MedicalPulse"/>
+        </Button>
+        <Button  Command="{Binding CommandNavigate}" CommandParameter="goto2">
+          <Button.ToolTip>
+            <ToolTip Style="{StaticResource HelpTooltip}">
+              <Border Style="{StaticResource Border2}">
+                <TextBlock Text="Вызов 2" Margin="20, 0, 10, 0" FontSize="16" Foreground="Blue"/>
+              </Border>
+            </ToolTip>
+          </Button.ToolTip>
+          <iconPacks:PackIconModern  Style="{StaticResource HwIconModern}" Kind="CloudDownload" />
+        </Button>
+      </StackPanel>
+    </mah:WindowCommands>
+
+
+  </mah:MetroWindow.LeftWindowCommands>
+  <!--#endregion-->
+
+  <!--#region ___ FLYOUTS PANELS ___-->
+  <mah:MetroWindow.Flyouts>
+    <mah:FlyoutsControl >
+      <!--  ====>>>>  Правая панель  <<<<=====  -->
+      <mah:Flyout Position="Right"  
+                    Header="Настройка программы"  
+                    IsOpen="{Binding IsSetups}" 
+                    Style="{StaticResource VbFlyout}">
+
+        <ContentControl prism:RegionManager.RegionName="{x:Static constants:NameRegions.SetCAN}"/>
+
+      </mah:Flyout>
+      <!--  ====>>>>  Левая панель  <<<<=====  -->
+      <mah:Flyout Position="Left"  Width="50"
+                    IsOpen="{Binding IsGoto0}" 
+                    Style="{StaticResource VbFlyout}">
+
+        <!--#region кнопка  -->
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition />
+            <RowDefinition />
+          </Grid.RowDefinitions>
+          <StackPanel Grid.Row="0"  VerticalAlignment="Top">
+            <Button Height="80" Width="30" Margin="0, 20, 0, 20"
+            Command="{Binding NavigateCommand}"
+            CommandParameter="buttonA2L">
+              <Button.ToolTip>
+                <ToolTip Style="{StaticResource HelpTooltip}">
+                  <Border Style="{StaticResource Border2}">
+                    <StackPanel Orientation="Vertical" >
+                      <TextBlock Text="Запускаем тесты в автомат режиме." 
+                               Margin="3, 2, 3, 1" 
+                               FontSize="16"/>
+                    </StackPanel>
+                  </Border>
+                </ToolTip>
+              </Button.ToolTip>
+
+              <iconPacks:PackIconModern  
+            Style="{StaticResource HwIconModern}" Width="18" Height="18"
+              Background="Black"
+            Kind="TextAlignJustify"/>
+            </Button>
+
+            <Button  Height="80" Width="30" Margin="0, 20, 0, 20" BorderBrush="BlueViolet"
+            Command="{Binding NavigateCommand}"
+            CommandParameter="buttonA2L">
+              <Button.ToolTip>
+                <ToolTip Style="{StaticResource HelpTooltip}">
+                  <Border Style="{StaticResource Border2}">
+                    <StackPanel Orientation="Vertical" >
+                      <TextBlock Text="Запускаем тесты в ручном режиме" 
+                               Margin="3, 2, 3, 1" 
+                               FontSize="16"/>
+                    </StackPanel>
+                  </Border>
+                </ToolTip>
+              </Button.ToolTip>
+
+              <iconPacks:PackIconModern  
+            Style="{StaticResource HwIconModern}" Width="18" Height="18"
+            Background="Black"              
+            Kind="TextAlignCenter"/>
+            </Button>
+          </StackPanel>
+          <StackPanel Grid.Row="1"  VerticalAlignment="Bottom">
+
+            <Button Height="80" Width="30" Margin="0, 10, 0, 10"
+              Command="{Binding CommandNavigate}"
+              CommandParameter="WCan">
+              <Button.ToolTip>
+                <ToolTip Style="{StaticResource HelpTooltip}">
+                  <Border Style="{StaticResource Border2}">
+                    <TextBlock Text="Просмотр CAN." 
+                               Margin="3, 2, 3, 1" 
+                               FontSize="16"/>
+                  </Border>
+                </ToolTip>
+              </Button.ToolTip>
+
+              <iconPacks:PackIconModern  
+            Style="{StaticResource HwIconModern}" Width="18" Height="18"
+              Background="Black"
+            Kind="VideoBasic"/>
+            </Button>
+
+            <Button Height="80" Width="30" Margin="0, 20, 0, 10"
+              Command="{Binding CommandNavigate}"
+              CommandParameter="WInfoTable">
+              <Button.ToolTip>
+                <ToolTip Style="{StaticResource HelpTooltip}">
+                  <Border Style="{StaticResource Border2}">
+                    <TextBlock Text="Включить таблицу с информацией." 
+                               Margin="3, 2, 3, 1" 
+                               FontSize="16"/>
+                  </Border>
+                </ToolTip>
+              </Button.ToolTip>
+
+              <iconPacks:PackIconModern  
+            Style="{StaticResource HwIconModern}" Width="18" Height="18"
+              Background="Black"
+            Kind="Anchor"/>
+            </Button>
+
+          </StackPanel>
+
+        </Grid>
+
+        <!--#endregion-->
+
+        <!-- 
+        <ContentControl prism:RegionManager.RegionName="{x:Static constants:NameRegions.LoadFile}"/>
+-->
+      </mah:Flyout>
+
+      <!--  ====>>>>  Левая панель  <<<<=====  -->
+      <mah:Flyout Position="Left"  
+                    Header="Панель под первую кнопку"  
+                    IsOpen="{Binding IsGoto1}" 
+                    Style="{StaticResource VbFlyout}">
+        <!-- 
+        <ContentControl prism:RegionManager.RegionName="{x:Static constants:NameRegions.LoadFile}"/>
+-->
+      </mah:Flyout>
+      <mah:Flyout Position="Left"  
+                    Header="Панель под вторую кнопку"  
+                    IsOpen="{Binding IsGoto2}" 
+                    Style="{StaticResource VbFlyout}">
+        <!--        
+        <ContentControl prism:RegionManager.RegionName="{x:Static constants:NameRegions.LoadFile}"/>
+-->
+      </mah:Flyout>
+
+    </mah:FlyoutsControl>
+  </mah:MetroWindow.Flyouts>
+  <!--#endregion-->
+
+  <DockPanel>
+    <DockPanel DockPanel.Dock="Top">
+      <TextBlock Text="Прогрвмма для тестирования." 
+                 FontSize="18" HorizontalAlignment="Center" 
+                 FontWeight="DemiBold" FontStyle="Italic"/>
+    </DockPanel>
+    <Canvas Width="200" Height="50" 
+            HorizontalAlignment="Right" 
+            VerticalAlignment="Bottom"
+            Margin="0, 0, 0, 100" >
+      <Image Width="150" Height="150" Source="/Views/NPORD.png"  />
+    </Canvas>
+  </DockPanel>
 </mah:MetroWindow>
 
 <!--
