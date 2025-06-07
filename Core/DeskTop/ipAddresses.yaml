@@ -1,0 +1,30 @@
+0:
+  id: 0
+  name: Server
+  ipAddress: 127.0.0.1
+  port1: 20000
+  port2: 20001
+1:
+  id: 1
+  name: TclFFT
+  ipAddress: 127.0.0.1
+  port1: 20010
+  port2: 20011
+2:
+  id: 2
+  name: TmFFT
+  ipAddress: 127.0.0.1
+  port1: 20020
+  port2: 20021
+3:
+  id: 3
+  name: OpenCL
+  ipAddress: 127.0.0.1
+  port1: 20030
+  port2: 20031
+4:
+  id: 4
+  name: CUDA
+  ipAddress: 127.0.0.1
+  port1: 20040
+  port2: 20041

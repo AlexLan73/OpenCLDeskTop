@@ -1,43 +1,16 @@
-﻿// See https://aka.ms/new-console-template for more information
-
-using System;
-using System.Net;
-using System.Net.Sockets;
-using System.Text;
-using System.Threading.Tasks;
-
-using System;
+﻿using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
-Console.WriteLine("Test Server - SEND 127.0.0.1 port 20010");
-
-IPAddress localIP = IPAddress.Parse("127.0.0.1");
-int recPort = 20011; // фиксированный исходящий порт клиента
-
-IPAddress serverIP = IPAddress.Parse("127.0.0.1");
-int sendPort = 20010;
-
-/*
-var serverThread = new System.Threading.Thread(TcpYamlServer.Run);
-serverThread.Start();
-
-System.Threading.Thread.Sleep(500); // Даем серверу время запуститься
-*/
-TcpYamlClient.Run();
-
-//serverThread.Join();
-
-
 public class Message
 {
   public string Text { get; set; }
   public int Number { get; set; }
 }
-/*
+
 class TcpYamlServer
 {
   public static void Run()
@@ -96,7 +69,6 @@ class TcpYamlServer
     Console.WriteLine("Server finished.");
   }
 }
-*/
 
 class TcpYamlClient
 {
@@ -154,3 +126,17 @@ class TcpYamlClient
   }
 }
 
+class Program
+{
+  static void Main()
+  {
+      var serverThread = new System.Threading.Thread(TcpYamlServer.Run);
+      serverThread.Start();
+
+      System.Threading.Thread.Sleep(500); // Даем серверу время запуститься
+
+      TcpYamlClient.Run();
+
+      serverThread.Join();
+  }
+}

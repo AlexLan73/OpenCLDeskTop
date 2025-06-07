@@ -1,8 +1,6 @@
-﻿// See https://aka.ms/new-console-template for more information
-
-using System;
-using System.Net;
-using System.Net.Sockets;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -10,34 +8,29 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Windows.Forms;
+using Common.Core.Property;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
+namespace Modules.Core;
 
-Console.WriteLine("Test Server - SEND 127.0.0.1 port 20010");
-
-IPAddress localIP = IPAddress.Parse("127.0.0.1");
-int recPort = 20011; // фиксированный исходящий порт клиента
-
-IPAddress serverIP = IPAddress.Parse("127.0.0.1");
-int sendPort = 20010;
-
-/*
-var serverThread = new System.Threading.Thread(TcpYamlServer.Run);
-serverThread.Start();
-
-System.Threading.Thread.Sleep(500); // Даем серверу время запуститься
-*/
-TcpYamlClient.Run();
-
-//serverThread.Join();
-
-
-public class Message
+public class TestSocketPrimer
 {
-  public string Text { get; set; }
-  public int Number { get; set; }
+  public void Run()
+  {
+    var serverThread = new System.Threading.Thread(TcpYamlServer.Run);
+    serverThread.Start();
+
+    System.Threading.Thread.Sleep(500); // Даем серверу время запуститься
+
+    TcpYamlClient.Run();
+
+    serverThread.Join();
+  }
 }
-/*
+
+
+
 class TcpYamlServer
 {
   public static void Run()
@@ -75,7 +68,7 @@ class TcpYamlServer
       }
 
       var yamlString = Encoding.UTF8.GetString(buffer);
-      var message = deserializer.Deserialize<Message>(yamlString);
+      var message = deserializer.Deserialize<myMessage>(yamlString);
       Console.WriteLine($"Received: Text='{message.Text}', Number={message.Number}");
 
       // Обработка
@@ -96,7 +89,6 @@ class TcpYamlServer
     Console.WriteLine("Server finished.");
   }
 }
-*/
 
 class TcpYamlClient
 {
@@ -113,7 +105,7 @@ class TcpYamlClient
     client.Connect(IPAddress.Loopback, 20010);
     using var stream = client.GetStream();
 
-    var message = new Message { Text = "start", Number = 0 };
+    var message = new myMessage { Text = "start", Number = 0 };
 
     for (int i = 0; i < 10; i++)
     {
@@ -142,7 +134,7 @@ class TcpYamlClient
       }
 
       var yamlReceived = Encoding.UTF8.GetString(buffer);
-      message = deserializer.Deserialize<Message>(yamlReceived);
+      message = deserializer.Deserialize<myMessage>(yamlReceived);
       message.Text += " !!-client";
       message.Number += 1;
 
@@ -153,4 +145,3 @@ class TcpYamlClient
     Console.WriteLine("Client finished.");
   }
 }
-
