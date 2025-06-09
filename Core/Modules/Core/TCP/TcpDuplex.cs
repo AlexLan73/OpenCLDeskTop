@@ -1,113 +1,95 @@
-﻿using Common.Core;
-using Common.Enum;
-using ControlzEx.Standard;
-using Microsoft.AspNetCore.Html;
-using System;
-using System;
-using System.Collections;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Net.Sockets;
-using System.Text;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Windows.Forms;
-using Windows.Services.Maps;
-using YamlDotNet.Serialization;
-using YamlDotNet.Serialization.NamingConventions;
-using Common.Core.Property;
+﻿using System.Windows.Forms;
 
-namespace Modules.Core;
+namespace Modules.Core.TCP;
 
-public class TcpDuplex
+public class TcpDuplex:IDisposable
 {
-  private IDeserializer _deserializer;
-  private ISerializer _serializer;
-  private IpAddressOne _ipAddress;
-  private readonly string _sIpAddress;
-  private readonly int _portRead;
-  private IPEndPoint _ipEndPointRead;
-  private readonly int _portSend;
-  private IPEndPoint _ipEndPointSend;
-  private TcpListener _listenerRead;
-  private CancellationTokenSource _cts;
-  private CancellationToken _token;
-  private Regex _regex;
-  private TcpClient _clientSend = null;
-  private NetworkStream _streamSend = null;
-  private ConcurrentQueue<(byte[] Send, byte[] mBytes)> _queueSend = new ConcurrentQueue<(byte[], byte[])>();
-  private static ManualResetEvent _waitHandle = new ManualResetEvent(false);
-
-  //  private readonly int _countByte = 1024 * 8;
+  public Task TaskRead;
+  private readonly IDeserializer _deserializer;
+  private readonly ISerializer _serializer;
+  private readonly IPEndPoint _ipEndPointSend;
+  private readonly TcpListener _listenerRead;
+  private readonly CancellationTokenSource _cts;
+  private readonly CancellationToken _token;
+  private readonly Regex _regex;
+  private TcpClient _clientSend;
+  private NetworkStream _streamSend;
+  private readonly ConcurrentQueue<(byte[] Send, byte[] mBytes)> _queueSend = new ConcurrentQueue<(byte[], byte[])>();
+  private readonly ManualResetEvent _waitHandle = new ManualResetEvent(false);
+  public IpAddressOne IpAddress { get; private set; }
+  private Func<string, bool> _parserExternalFunction;
   public TcpDuplex(IpAddressOne ipAddress)
   {
+    IpAddress = ipAddress;
     _regex = new Regex(@"[\x00-\x1F\x7F]", RegexOptions.Compiled);
-    ConcurrentQueue<(byte[] First, byte[] Second)> queue = new ConcurrentQueue<(byte[], byte[])>();
 
-    _ipAddress = ipAddress;
-    _sIpAddress = ipAddress.IpAddress;
-    _portRead = _ipAddress.Port1;  // поот сервера чтение
-    _portSend = _ipAddress.Port2;      // порт клиента куда передавать
+    var sIpAddress = ipAddress.IpAddress;
+    var portRead = ipAddress.Port1;   // поот сервера чтение
+    var portSend = ipAddress.Port2;   // порт клиента куда передавать
 
-  _deserializer = new DeserializerBuilder()
+    _deserializer = new DeserializerBuilder()
       .WithNamingConvention(CamelCaseNamingConvention.Instance)
       .Build();
     _serializer = new SerializerBuilder()
       .WithNamingConvention(CamelCaseNamingConvention.Instance)
       .Build();
 
-    _ipEndPointRead = new IPEndPoint(IPAddress.Parse(_sIpAddress), _portRead);
-    _ipEndPointSend = new IPEndPoint(IPAddress.Parse(_sIpAddress), _portSend);
+    var ipEndPointRead = new IPEndPoint(IPAddress.Parse(sIpAddress), portRead);
+    _ipEndPointSend = new IPEndPoint(IPAddress.Parse(sIpAddress), portSend);
 
-    _listenerRead = new TcpListener(_ipEndPointRead);
+    _listenerRead = new TcpListener(ipEndPointRead);
 
     _cts = new CancellationTokenSource();
     _token = _cts.Token;
-
   }
-
   public void TestSendCommand(myMessage message)
   {
     var responseYaml = _serializer.Serialize(message);
     SendData(responseYaml);
   }
-
   protected virtual void SendData(string data)
   {
-//    var yamlToSend = _serializer.Serialize(message);
     var bytesToSend = Encoding.UTF8.GetBytes(data);
     var lengthBytes = BitConverter.GetBytes(bytesToSend.Length);
     _queueSend.Enqueue((bytesToSend, lengthBytes));
-    _waitHandle.Set(); // Сигнализируем, что есть данные в очереди
+    _waitHandle.Set();     // Сигнализируем, что есть данные в очереди
   }
-  public void StopReadServer()
-  {
-    _cts.Cancel();
-    _listenerRead.Stop();
-  }
-
+  public void InitializationExternalFunction(Func<string, bool> parserFunc) =>_parserExternalFunction = parserFunc;
+  
   protected virtual bool ParserReadString(string sRead)
   {
+    if (_parserExternalFunction != null)
+      // Вызов переданной функции
+      return _parserExternalFunction(sRead);
+    else
+    {
+      try
+      {
+        var message = _deserializer.Deserialize<myMessage>(sRead);
+        Console.WriteLine($"Port: {IpAddress.Port1};   Received: Text='{message.Text}', Number={message.Number}");
+        return true;
+      }
+      catch (Exception e)
+      {
+        Console.WriteLine("Выполняется стандартный парсинг: " + sRead);
+        return true; // или другая логика
+      }
+    }
+    return false;
+  }
+  protected virtual bool ParserReadString1(string sRead)
+  {
     var message = _deserializer.Deserialize<myMessage>(sRead);
-    Console.WriteLine($"Received: Text='{message.Text}', Number={message.Number}");
-
-    // Обработка
-//    message.Text += " server";
-//    message.Number += 1;
-
-//    var responseYaml = _serializer.Serialize(message);
-//    var responseBytes = Encoding.UTF8.GetBytes(responseYaml);
+    Console.WriteLine($"Port: {IpAddress.Port1};   Received: Text='{message.Text}', Number={message.Number}");
 
     return true;
   }
 
-  public async Task RunRead()
+  public void RunRead()
   {
-    await Task.Run(() =>
+    Console.WriteLine($"start  Port: {IpAddress.Port1};   Name: {IpAddress.Name}");
+
+    TaskRead =  Task.Run(() =>
     {
       _listenerRead.Start();
       try
@@ -119,6 +101,7 @@ public class TcpDuplex
           using var streamRead = clientRead.GetStream();
 
           var lengthBytes = new byte[4];
+          // ReSharper disable once UnusedVariable
           var i = streamRead.Read(lengthBytes, 0, 4);
           var messageLength = BitConverter.ToInt32(lengthBytes, 0);
 
@@ -127,7 +110,7 @@ public class TcpDuplex
           var totalRead = 0;
           while (totalRead < messageLength)
           {
-            int read = streamRead.Read(buffer, totalRead, messageLength - totalRead);
+            var read = streamRead.Read(buffer, totalRead, messageLength - totalRead);
             if (read == 0) throw new Exception("Disconnected");
             totalRead += read;
           }
@@ -149,7 +132,7 @@ public class TcpDuplex
       {
         // Слушатель остановлен, выходим из цикла
         _listenerRead.Stop();
-//        Console.WriteLine("Server finished.");
+        Console.WriteLine($"STOP  Port: {IpAddress.Port1};   Name: {IpAddress.Name}");
         return Task.CompletedTask;
 
       }
@@ -158,19 +141,18 @@ public class TcpDuplex
         // Слушатель уничтожен, выходим из цикла
       }
 
+      Console.WriteLine($"STOP  Port: {IpAddress.Port1};   Name: {IpAddress.Name}");
+
       return Task.CompletedTask;                                                                              
     }, _token);
 
   }
-
   private bool ConnectSend()
   {
     try
     {
       _clientSend?.Dispose();
       _clientSend = new TcpClient();
-//      _ipEndPointRead = new IPEndPoint(IPAddress.Parse(_sIpAddress), _portRead);
-//      _ipEndPointSend = new IPEndPoint(IPAddress.Parse(_sIpAddress), _portSend);
       _clientSend.Connect(_ipEndPointSend);
       _streamSend = _clientSend.GetStream();
       return true;
@@ -183,15 +165,10 @@ public class TcpDuplex
       return false;
     }
   }
-          
   private int SendMessage()
   {
-
     try
     {
-      //      var yamlToSend = _serializer.Serialize(message);
-      //      var bytesToSend = Encoding.UTF8.GetBytes(yamlToSend);
-      //      var lengthBytes = BitConverter.GetBytes(bytesToSend.Length);
 
       if (_queueSend.TryPeek(out var tuple)) 
       {
@@ -207,18 +184,18 @@ public class TcpDuplex
 
       // Чтение ответа (пример)
       var responseLengthBytes = new byte[4];
-      int read = _streamSend.Read(responseLengthBytes, 0, 4);
+      var read = _streamSend.Read(responseLengthBytes, 0, 4);
       if (read < 4) throw new IOException("Disconnected");
 
-      int responseLength = BitConverter.ToInt32(responseLengthBytes, 0);
+      var responseLength = BitConverter.ToInt32(responseLengthBytes, 0);
       var buffer = new byte[responseLength];
-      int totalRead = 0;
+      var totalRead = 0;
       while (totalRead < responseLength)
       {
-        int bytesRead = _streamSend.Read(buffer, totalRead, responseLength - totalRead);
+        var bytesRead = _streamSend.Read(buffer, totalRead, responseLength - totalRead);
         if (bytesRead == 0) throw new IOException("Disconnected");
         totalRead += bytesRead;
-      };
+      }
 
       var yamlReceived = _regex.Replace(Encoding.UTF8.GetString(buffer), "");
       Console.WriteLine($"Received: {yamlReceived}");
@@ -235,7 +212,6 @@ public class TcpDuplex
       return -1;
     }
   }
-
   public async Task RunSend()
   {
     await Task.Run(() =>
@@ -281,14 +257,21 @@ public class TcpDuplex
       }
       return Task.CompletedTask;
     }, _token);
-    var message = new myMessage { Text = "start", Number = 0 };
-
 
     //    client1.Close();
     Console.WriteLine("Client finished.");
   }
-
-
+  public void Dispose()
+  {
+    _cts.Cancel();
+    _listenerRead.Stop();
+    _listenerRead?.Dispose();
+    _cts?.Dispose();
+    _clientSend?.Dispose();
+    _streamSend?.Dispose();
+    if(TaskRead!=null)
+      Task.WaitAll(TaskRead);
+  }
 }
 
 

@@ -25,6 +25,9 @@ public class ReadWriteYaml(string pathFileName)
     // Читаем YAML из файла и десериализуем обратно в словарь
     using var reader = new StreamReader(_pathFileName);
     var loadedDict = deserializer.Deserialize<Dictionary<int, IpAddressOne>>(reader);
+
+//    IDataContext.AddIpAddress(loadedDict)
+
     return loadedDict;
   }
 

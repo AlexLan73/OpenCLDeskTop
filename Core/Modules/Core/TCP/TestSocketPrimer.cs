@@ -12,16 +12,16 @@ using System.Windows.Forms;
 using Common.Core.Property;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
-namespace Modules.Core;
+namespace Modules.Core.TCP;
 
 public class TestSocketPrimer
 {
   public void Run()
   {
-    var serverThread = new System.Threading.Thread(TcpYamlServer.Run);
+    var serverThread = new Thread(TcpYamlServer.Run);
     serverThread.Start();
 
-    System.Threading.Thread.Sleep(500); // Даем серверу время запуститься
+    Thread.Sleep(500); // Даем серверу время запуститься
 
     TcpYamlClient.Run();
 

@@ -12,7 +12,7 @@
   port2: 20011
 2:
   id: 2
-  name: TmFFT
+  name: TminskFFT
   ipAddress: 127.0.0.1
   port1: 20020
   port2: 20021

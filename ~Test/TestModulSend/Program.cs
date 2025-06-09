@@ -3,6 +3,7 @@
 using ControlzEx.Standard;
 using System;
 using System;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -13,6 +14,7 @@ using Modules.Core;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 using Common.Core.Property;
+using Modules.Core.TCP;
 
 Console.WriteLine("Test Server - SEND 127.0.0.1 port 20010");
 
@@ -20,6 +22,40 @@ Console.WriteLine("Test Server - SEND 127.0.0.1 port 20010");
 string _pathYaml = "E:\\C#\\OpenCLDeskTop\\Core\\DeskTop\\ipAddresses.yaml";
 
 var _dIp = new ReadWriteYaml(_pathYaml).ReadYaml();
+
+ConcurrentDictionary<int, TcpDuplex> _dTpcDuplexes = new();
+foreach (var (key, val1) in _dIp)
+{
+  var val = val1;
+//  var _ipAddress = val;
+  (val.Port1, val.Port2) = (val.Port2, val.Port1);
+  _dTpcDuplexes.AddOrUpdate(
+    key,
+    new TcpDuplex(val), // значение для добавления, если ключ отсутствует
+    (Key, Value) => new TcpDuplex(val) // функция обновления, если ключ есть
+  );
+  _dTpcDuplexes[key].RunSend();
+}
+
+string _start = "Start ";
+for (int i0 = 0; i0 < 10; i0++)
+{
+  _start += $"-!- {i0} "; 
+  for (int i = 0; i < _dTpcDuplexes.Count; i++)
+  {
+    _dTpcDuplexes[i].TestSendCommand(new myMessage { Text = $"Port: {_dTpcDuplexes[i].IpAddress.Port1} =>  {_start}", Number = i0 });
+  }
+}
+Thread.Sleep(2000); // Даем серверу время запуститься
+
+for (int i = 0; i < _dTpcDuplexes.Count; i++)
+  _dTpcDuplexes[i].Dispose();
+
+
+int hh = 1;
+
+
+/*
 var _ipAddress = _dIp[1];
 (_ipAddress.Port1, _ipAddress.Port2) = (_ipAddress.Port2, _ipAddress.Port1);
 
@@ -30,9 +66,11 @@ _v0.TestSendCommand(new myMessage { Text = "s-tart", Number = 1 });
 _v0.TestSendCommand(new myMessage { Text = "s-t-art", Number = 2 });
 _v0.TestSendCommand(new myMessage { Text = "s-t-a-rt", Number = 3 });
 _v0.TestSendCommand(new myMessage { Text = "s-t-a-r-t", Number = 4 });
-_v0.StopReadServer();
+_v0.Dispose();
+
 Task.WaitAll(_task);
 int hh = 1;
+*/
 
 //IPAddress localIP = IPAddress.Parse("127.0.0.1");
 //int recPort = 20011; // фиксированный исходящий порт клиента

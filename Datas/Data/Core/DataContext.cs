@@ -24,17 +24,24 @@ public interface IDataContext
   ConcurrentDictionary<string, uint> DNameIdCanMatrixElement { get; set; }
   ConcurrentDictionary<string, Guid> DNameIdMatrixElement { get; set; }
   ConcurrentDictionary<string, dynamic> DGlobalData { get; set; }
+  ConcurrentDictionary<int, IpAddressOne> DIdIpAddress { get; set; }
+  ConcurrentDictionary<string, IpAddressOne> DNameIpAddress { get; set; }
 }
 public class DataContext: IDataContext, IDisposable
 {
   private AutoResetEvent waitHandler = new AutoResetEvent(true);  // объект-событие
   private bool _isReadCan=true;
 
+  public ConcurrentDictionary<int, IpAddressOne> DIdIpAddress { get; set; }
+  public ConcurrentDictionary<string, IpAddressOne> DNameIpAddress { get; set; }
+
+
   #region ___ CAN ___
 
   public ConcurrentDictionary<string, uint> DNameIdCanMatrixElement { get; set; } = new();
   public ConcurrentDictionary<string, Guid> DNameIdMatrixElement { get; set; } = new();
   public ConcurrentDictionary<string, dynamic> DGlobalData { get; set; } = new();
+
 
   #endregion
   // DElement -> Элемент - вывод на панель данные 
@@ -57,6 +64,9 @@ public class DataContext: IDataContext, IDisposable
 //    _nameId.Add("")
     _container = containerProvider;
     _logger = _container.Resolve<IManagerLogger>();
+//    DIdIpAddress = { get; set; }
+//    DNameIpAddress { get; set; }
+
 
 //!!!!  Вернуть когда будет CAN
 //    _container.Resolve<JobCAN>().InicialAdd(AddCAN);
@@ -70,13 +80,23 @@ public class DataContext: IDataContext, IDisposable
 //    Task.Run(SetDataCan);
   }
 
-/*
-  public DataContext()
+  public void AddIpAddress(Dictionary<int, IpAddressOne> data)
   {
-    TestCanReserveWords();
-//    TestStartCanRead();
+    DIdIpAddress = new ConcurrentDictionary<int, IpAddressOne>(data);
+    var data1 = new Dictionary<string, IpAddressOne>();
+    foreach (var (key, val) in data)
+      data1.TryAdd(val.Name, val);
+
+    DNameIpAddress = new ConcurrentDictionary<string, IpAddressOne>(data1);
   }
-*/
+
+  /*
+    public DataContext()
+    {
+      TestCanReserveWords();
+  //    TestStartCanRead();
+    }
+  */
   private void AddCanElementRead(Element elementCanData, string comment = "", bool? _is = null)
   {
     if (elementCanData == null) return;
