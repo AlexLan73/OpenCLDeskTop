@@ -24,7 +24,7 @@ string _pathYaml = "E:\\C#\\OpenCLDeskTop\\Core\\DeskTop\\ipAddresses.yaml";
 var _dIp = new ReadWriteYaml(_pathYaml).ReadYaml();
 
 ConcurrentDictionary<int, TcpDuplex> _dTpcDuplexes = new();
-foreach (var (key, val1) in _dIp)
+foreach (var (key, val1) in _dIp.Where(x=>x.Key==0))
 {
   var val = val1;
 //  var _ipAddress = val;

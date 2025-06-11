@@ -2,13 +2,17 @@
 using System.Windows.Forms;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.NamingConventions;
 
 namespace Modules.Core;
 
 public class ReadWriteYaml(string pathFileName)
 {
   private string _pathFileName = pathFileName;
-
   public Dictionary<int, IpAddressOne> ReadYaml(string path = null)
   {
     if(!string.IsNullOrEmpty(path))
@@ -25,8 +29,6 @@ public class ReadWriteYaml(string pathFileName)
     // Читаем YAML из файла и десериализуем обратно в словарь
     using var reader = new StreamReader(_pathFileName);
     var loadedDict = deserializer.Deserialize<Dictionary<int, IpAddressOne>>(reader);
-
-//    IDataContext.AddIpAddress(loadedDict)
 
     return loadedDict;
   }
@@ -48,7 +50,14 @@ public class ReadWriteYaml(string pathFileName)
     using var writer = new StreamWriter(_pathFileName);
     serializer.Serialize(writer, data);
   }
+
+
 }
+
+
+
+
+
 
 /*
     

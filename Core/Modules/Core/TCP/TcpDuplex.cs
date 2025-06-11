@@ -1,10 +1,13 @@
 ﻿using System.Windows.Forms;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace Modules.Core.TCP;
 
 public class TcpDuplex:IDisposable
 {
   public Task TaskRead;
+  public Task TaskSend;
+
   private readonly IDeserializer _deserializer;
   private readonly ISerializer _serializer;
   private readonly IPEndPoint _ipEndPointSend;
@@ -111,7 +114,11 @@ public class TcpDuplex:IDisposable
           while (totalRead < messageLength)
           {
             var read = streamRead.Read(buffer, totalRead, messageLength - totalRead);
-            if (read == 0) throw new Exception("Disconnected");
+            if (read == 0)
+            {
+              //throw new Exception("Disconnected");
+              break;
+            }
             totalRead += read;
           }
 
@@ -212,9 +219,9 @@ public class TcpDuplex:IDisposable
       return -1;
     }
   }
-  public async Task RunSend()
+  public void RunSend()
   {
-    await Task.Run(() =>
+    TaskSend = Task.Run(() =>
     {
       var repeatQueueRead = 3;
       while (!_token.IsCancellationRequested)
@@ -269,8 +276,9 @@ public class TcpDuplex:IDisposable
     _cts?.Dispose();
     _clientSend?.Dispose();
     _streamSend?.Dispose();
-    if(TaskRead!=null)
-      Task.WaitAll(TaskRead);
+    if(TaskRead==null || TaskRead.Status == TaskStatus.Faulted)
+      return;
+    Task.WaitAll(TaskRead);
   }
 }
 

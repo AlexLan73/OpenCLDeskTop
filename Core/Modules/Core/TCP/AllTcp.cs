@@ -27,7 +27,7 @@ public class AllTcp:IDisposable
       dIpAddress = new ReadWriteYaml(pathFileYaml).ReadYaml();
     }
     //  Перенести в блок Data
-    foreach (var (key, value) in dIpAddress)
+    foreach (var (key, value) in dIpAddress.Where(x=>x.Key==0))
     {
       _dAllTcp.AddOrUpdate(
         key,

@@ -11,24 +11,6 @@ public interface IIpAddressOne
 public class IpAddressOne: IIpAddressOne
 {
 
-  //public IpAddressOne(IIpAddressOne source) 
-  //  : this(source.Id, source.Name, source.IpAddress, source.Port1)
-  //{
-  //}
-
-  //public IpAddressOne(int id, string name, string ipAddress, int port)
-  //{
-  //  Id = id;
-  //  Name  = name;
-  //  IpAddress  = ipAddress;
-  //  Port1  = port;
-
-  //}
-
-  //public IpAddressOne()
-  //{
-  //}
-
   public int Id { get; set; }
   public string Name { get; set; }
   public string IpAddress { get; set; }
@@ -36,3 +18,21 @@ public class IpAddressOne: IIpAddressOne
   public int Port2 { get; set; }
 }
 
+
+//public IpAddressOne(IIpAddressOne source) 
+//  : this(source.Id, source.Name, source.IpAddress, source.Port1)
+//{
+//}
+
+//public IpAddressOne(int id, string name, string ipAddress, int port)
+//{
+//  Id = id;
+//  Name  = name;
+//  IpAddress  = ipAddress;
+//  Port1  = port;
+
+//}
+
+//public IpAddressOne()
+//{
+//}
