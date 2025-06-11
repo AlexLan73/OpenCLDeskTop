@@ -282,6 +282,180 @@ public class TcpDuplex:IDisposable
   }
 }
 
+/*
+ 
+ */
+
+/* ПРИМЕР AI
+
+RunRED!!!!!!!!!!!
+private TcpListener _listenerRead;
+   private CancellationToken _token;
+   private ISerializer _serializer;  // Предполагается, что это тип сериализатора
+   private IpAddressType IpAddress;  // Ваш тип с Port1 и Name
+   
+   public YourClassName(IpAddressType ipAddress, CancellationToken token, ISerializer serializer)
+   {
+       IpAddress = ipAddress;
+       _token = token;
+       _serializer = serializer;
+       _listenerRead = new TcpListener(IPAddress.Any, IpAddress.Port1);
+   }
+
+public void RunRead()
+   {
+       Console.WriteLine($"start  Port: {IpAddress.Port1};   Name: {IpAddress.Name}");
+   
+       TaskRead = Task.Run(async () =>
+       {
+           _listenerRead.Start();
+   
+           try
+           {
+               while (!_token.IsCancellationRequested)
+               {
+                   using var clientRead = await _listenerRead.AcceptTcpClientAsync(_token);
+                   using var streamRead = clientRead.GetStream();
+   
+                   // Читаем длину сообщения (4 байта)
+                   var lengthBytes = new byte[4];
+                   int readBytes = await streamRead.ReadAsync(lengthBytes, 0, 4, _token);
+                   if (readBytes < 4) continue; // или обработать ошибку
+   
+                   int messageLength = BitConverter.ToInt32(lengthBytes, 0);
+                   if (messageLength <= 0) continue;
+   
+                   // Читаем YAML-сообщение полностью
+                   var buffer = new byte[messageLength];
+                   int totalRead = 0;
+                   while (totalRead < messageLength)
+                   {
+                       int bytesRead = await streamRead.ReadAsync(buffer, totalRead, messageLength - totalRead, _token);
+                       if (bytesRead == 0) break; // Клиент отключился
+                       totalRead += bytesRead;
+                   }
+                   if (totalRead < messageLength) continue; // Сообщение неполное
+   
+                   var yamlString = Encoding.UTF8.GetString(buffer);
+   
+                   var ok = ParserReadString(yamlString) ? "ok" : "not";
+   
+                   var responseYaml = _serializer.Serialize(ok);
+                   var responseBytes = Encoding.UTF8.GetBytes(responseYaml);
+                   var responseLengthBytes = BitConverter.GetBytes(responseBytes.Length);
+   
+                   await streamRead.WriteAsync(responseLengthBytes, 0, 4, _token);
+                   await streamRead.WriteAsync(responseBytes, 0, responseBytes.Length, _token);
+               }
+           }
+           catch (OperationCanceledException)
+           {
+               // Ожидаемое завершение по токену отмены
+           }
+           catch (SocketException)
+           {
+               Console.WriteLine($"Listener stopped on Port: {IpAddress.Port1}; Name: {IpAddress.Name}");
+           }
+           catch (ObjectDisposedException)
+           {
+               // Listener уничтожен, выход
+           }
+           finally
+           {
+               _listenerRead.Stop();
+               Console.WriteLine($"STOP  Port: {IpAddress.Port1};   Name: {IpAddress.Name}");
+           }
+       }, _token);
+   }
+   
+Основные улучшения
+   Асинхронное ожидание подключения и чтения через AcceptTcpClientAsync и ReadAsync с поддержкой CancellationToken — не блокирует поток.
+   
+   Инициализация TcpListener и сериализатора в конструкторе — один раз при создании объекта.
+   
+   Обработка исключений с разделением на ожидаемые (OperationCanceledException) и сетевые ошибки.
+   
+   Использование finally для гарантированной остановки слушателя.
+   
+   Проверка корректности прочитанных данных (например, длина сообщения).
+   
+   Упрощённый и понятный цикл чтения полного сообщения.
+   
+   Если нужно, могу помочь с интеграцией этого кода в ваш класс или с дополнительными рекомендациями по архитектуре.
+   
+   Related
+
+
+
+ ////////////////////////////////////////////
+    private int _repeatQueueRead;
+   private CancellationToken _token;
+   private AutoResetEvent _waitHandle;
+   private ConcurrentQueue<YourMessageType> _queueSend;
+   
+   public YourClassName(CancellationToken token, AutoResetEvent waitHandle, ConcurrentQueue<YourMessageType> queueSend)
+   {
+       _token = token;
+       _waitHandle = waitHandle;
+       _queueSend = queueSend;
+       _repeatQueueRead = 3;  // Инициализация счетчика повторов
+   }
+   
+    
+
+public void RunSend()
+   {
+       TaskSend = Task.Run(async () =>
+       {
+           while (!_token.IsCancellationRequested)
+           {
+               _waitHandle.WaitOne(1000);
+   
+               if (!_queueSend.IsEmpty)
+               {
+                   if (!ConnectSend())
+                   {
+                       Console.WriteLine("Не удалось подключиться к серверу");
+                       return;
+                   }
+               }
+   
+               while (!_queueSend.IsEmpty)
+               {
+                   var errorCode = SendMessage();
+   
+                   switch (errorCode)
+                   {
+                       case -1:
+                           if (!ConnectSend())
+                           {
+                               Console.WriteLine("Не удалось подключиться к серверу");
+                               return;
+                           }
+                           break;
+   
+                       case -2:
+                           _repeatQueueRead--;
+                           if (_repeatQueueRead <= 0)
+                           {
+                               _queueSend.Clear();
+                               _repeatQueueRead = 3;
+                           }
+                           break;
+   
+                       default:
+                           _repeatQueueRead = 3; // Сброс счетчика при успешной отправке
+                           break;
+                   }
+               }
+           }
+   
+           Console.WriteLine("Client finished.");
+       }, _token);
+   }
+    
+
+ */
 
 //if (!ConnectSend())
 //{
