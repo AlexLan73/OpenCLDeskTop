@@ -107,8 +107,52 @@ public class TcpDuplex:IDisposable
   {
     clientRead = _listenerRead.AcceptTcpClient();
     // Работа с клиентом
-    streamRead = clientRead.GetStream();
+//    streamRead = clientRead.GetStream();
 
+  }
+  bool IsConnected()
+  {
+    if (clientRead == null || !clientRead.Connected)
+      return false;
+
+    // Дополнительная проверка с помощью "пробного" чтения
+    try
+    {
+      // Проверяем, доступны ли данные (неблокирующая проверка)
+      return !(clientRead.Client.Poll(1, SelectMode.SelectRead) &&
+               (clientRead.Available > 0 
+                || !clientRead.Client.Poll(1, SelectMode.SelectError)));
+    }
+    catch
+    {
+      return false;
+    }
+  }
+
+  // Метод для подключения/переподключения
+  void EnsureConnected()
+  {
+    if (IsConnected()) return;
+
+    try
+    {
+      // Закрываем предыдущее соединение, если оно было
+      streamRead?.Close();
+      clientRead?.Close();
+
+      // Создаем новое подключение
+      clientRead = new TcpClient();
+      //      clientRead.Connect("server_address", port); // Укажите ваш адрес и порт
+      clientRead.Connect(IpAddress.IpAddress, IpAddress.Port1); // Укажите ваш адрес и порт
+      streamRead = clientRead.GetStream();
+    }
+    catch (Exception ex)
+    {
+      Console.WriteLine($"Ошибка подключения: {ex.Message}");
+      // Здесь можно добавить задержку перед повторной попыткой
+      Thread.Sleep(1000);
+      EnsureConnected(); // Рекурсивный вызов для повторной попытки
+    }
   }
 
   public void RunRead()
@@ -127,6 +171,9 @@ public class TcpDuplex:IDisposable
         {
 //          clientRead = _listenerRead.AcceptTcpClient();
           // Работа с клиентом
+
+          
+          EnsureConnected();
           streamRead = clientRead.GetStream();
 
           var lengthBytes = new byte[4];
@@ -140,29 +187,20 @@ public class TcpDuplex:IDisposable
           while (totalRead < messageLength)
           {
             var read = streamRead.Read(buffer, totalRead, messageLength - totalRead);
-            //if (read == 0)
-            //{
-            //  //throw new Exception("Disconnected");
-            //  break;
-            //}
             totalRead += read;
           }
 
-          //byte[] lengthBytes = new byte[4];
-          //socket.Receive(lengthBytes, 4, SocketFlags.None);
-          //uint netLength = BitConverter.ToUInt32(lengthBytes, 0);
 
-          //byte[] buffer = new byte[netLength];
-          //int received = 0;
-          //while (received < netLength)
-          //{
-          //  received += socket.Receive(buffer, received, (int)(netLength - received), SocketFlags.None);
-          //}
-          //string data = Encoding.UTF8.GetString(buffer);
+          // Отправка данных
+//          streamRead.Write(data, 0, data.Length);
 
+          // Чтение ответа (пример)
+//          byte[] buffer = new byte[1024];
+          //int bytesRead = streamRead.Read(buffer, 0, buffer.Length);
+          // ... обработка ответа
+        
 
-
-          var ok = "not";
+        var ok = "not";
           var yamlString = Encoding.UTF8.GetString(buffer);
           if (ParserReadString(yamlString))
             ok = "ok";
@@ -175,7 +213,7 @@ public class TcpDuplex:IDisposable
           streamRead.Write(responseBytes, 0, responseBytes.Length);
         }
       }
-      catch (SocketException)
+      catch (SocketException )
       {
         // Слушатель остановлен, выходим из цикла
         _listenerRead.Stop();
@@ -188,6 +226,13 @@ public class TcpDuplex:IDisposable
         reconnect();
         // Слушатель уничтожен, выходим из цикла
       }
+      catch (Exception ex)
+      {
+        Console.WriteLine($"Ошибка при работе с потоком: {ex.Message}");
+        EnsureConnected(); // Попытка переподключения при ошибке
+      }
+
+
 
       Console.WriteLine($"STOP  Port: {IpAddress.Port1};   Name: {IpAddress.Name}");
 
