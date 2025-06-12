@@ -9,7 +9,7 @@ public class TcpDuplex:IDisposable
   public Task TaskSend;
 
   private readonly IDeserializer _deserializer;
-  private readonly ISerializer _serializer;
+  public readonly ISerializer _serializer;
   private readonly IPEndPoint _ipEndPointSend;
   private readonly TcpListener _listenerRead;
   private readonly CancellationTokenSource _cts;
@@ -31,12 +31,13 @@ public class TcpDuplex:IDisposable
     var portSend = ipAddress.Port2;   // порт клиента куда передавать
 
     _deserializer = new DeserializerBuilder()
-      .WithNamingConvention(CamelCaseNamingConvention.Instance)
+//      .WithNamingConvention(CamelCaseNamingConvention.Instance)
       .Build();
     _serializer = new SerializerBuilder()
-      .WithNamingConvention(CamelCaseNamingConvention.Instance)
+//      .WithNamingConvention(CamelCaseNamingConvention.Instance)
       .Build();
 
+    
     var ipEndPointRead = new IPEndPoint(IPAddress.Parse(sIpAddress), portRead);
     _ipEndPointSend = new IPEndPoint(IPAddress.Parse(sIpAddress), portSend);
 

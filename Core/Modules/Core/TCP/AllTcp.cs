@@ -1,13 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Modules.Core.TCP; // пространство имен с Tcp00, Tcp01 ... Tcp09
+using System;
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
 using System.Linq;
 using System.Reflection;
-using Modules.Core.TCP; // пространство имен с Tcp00, Tcp01 ... Tcp09
+using System.Text;
+using System.Threading.Tasks;
 
 namespace Modules.Core.TCP;
 
@@ -35,7 +35,9 @@ public class AllTcp:IDisposable
         (Key, Value) => new TcpDuplex(value) // функция обновления, если ключ есть
       );
     }
-
+    // 'Text: server\r\nNumber: 0\r\n
+    // 
+    //string cc = _dAllTcp[0]._serializer.Serialize(new MSocket01(){Text = "server", Number = 0});
     foreach (var (key, value) in _dAllTcp)
     {
       _dAllTcp[key].RunRead();
