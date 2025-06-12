@@ -12,8 +12,9 @@ public class TcpDuplex:IDisposable
 
   private readonly IDeserializer _deserializer;
   public readonly ISerializer _serializer;
+  private readonly IPEndPoint _ipEndPointRead;
   private readonly IPEndPoint _ipEndPointSend;
-  private readonly TcpListener _listenerRead;
+  private  TcpListener _listenerRead;
   private readonly CancellationTokenSource _cts;
   private readonly CancellationToken _token;
   private readonly Regex _regex;
@@ -44,11 +45,11 @@ public class TcpDuplex:IDisposable
 //      .WithNamingConvention(CamelCaseNamingConvention.Instance)
       .Build();
 
-    
-    var ipEndPointRead = new IPEndPoint(IPAddress.Parse(sIpAddress), portRead);
+
+    _ipEndPointRead = new IPEndPoint(IPAddress.Parse(sIpAddress), portRead);
     _ipEndPointSend = new IPEndPoint(IPAddress.Parse(sIpAddress), portSend);
 
-    _listenerRead = new TcpListener(ipEndPointRead);
+    _listenerRead = new TcpListener(_ipEndPointRead);
 
     _cts = new CancellationTokenSource();
     _token = _cts.Token;
@@ -112,21 +113,27 @@ public class TcpDuplex:IDisposable
   }
   bool IsConnected()
   {
-    if (clientRead == null || !clientRead.Connected)
-      return false;
+    var _b0 = clientRead.Connected;
+//    if (clientRead == null || !clientRead.Connected)
+//      return false;
+      return clientRead is { Connected: true };
 
-    // Дополнительная проверка с помощью "пробного" чтения
-    try
-    {
-      // Проверяем, доступны ли данные (неблокирующая проверка)
-      return !(clientRead.Client.Poll(1, SelectMode.SelectRead) &&
-               (clientRead.Available > 0 
-                || !clientRead.Client.Poll(1, SelectMode.SelectError)));
-    }
-    catch
-    {
-      return false;
-    }
+
+    //// Дополнительная проверка с помощью "пробного" чтения
+    //try
+    //{
+    //  var _b1 = clientRead.Client.Poll(1, SelectMode.SelectRead);
+    //  var _b2 = clientRead.Available > 0;
+    //  var _b3 = clientRead.Client.Poll(1, SelectMode.SelectError);
+    //  var _b4 = (_b2 || !_b3);
+    //  var _b5 = !(_b1 && _b4);
+    //  // Проверяем, доступны ли данные (неблокирующая проверка)
+    //  return (_b1 && _b4);
+    //}
+    //catch
+    //{
+    //  return false;
+    //}
   }
 
   // Метод для подключения/переподключения
@@ -136,15 +143,21 @@ public class TcpDuplex:IDisposable
 
     try
     {
-      // Закрываем предыдущее соединение, если оно было
-      streamRead?.Close();
-      clientRead?.Close();
 
       // Создаем новое подключение
+      //clientRead = new TcpClient();
+      //clientRead.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+      //clientRead.Connect("localhost", 12345);
+
       clientRead = new TcpClient();
-      //      clientRead.Connect("server_address", port); // Укажите ваш адрес и порт
-      clientRead.Connect(IpAddress.IpAddress, IpAddress.Port1); // Укажите ваш адрес и порт
-      streamRead = clientRead.GetStream();
+      _listenerRead.Start();
+      clientRead = _listenerRead.AcceptTcpClient();
+//      clientRead.Connect(IpAddress.IpAddress, IpAddress.Port1); // Укажите ваш адрес и порт
+//      clientRead = _listenerRead.AcceptTcpClient();
+
+
+      //      _listenerRead.Start();
+      //      streamRead = clientRead.GetStream();
     }
     catch (Exception ex)
     {
@@ -157,6 +170,7 @@ public class TcpDuplex:IDisposable
 
   public void RunRead()
   {
+    int indRepeatNull = 10;
     Console.WriteLine($"start  Port: {IpAddress.Port1};   Name: {IpAddress.Name}");
 
     TaskRead =  Task.Run(() =>
@@ -169,12 +183,12 @@ public class TcpDuplex:IDisposable
 
         while (!_token.IsCancellationRequested)
         {
-//          clientRead = _listenerRead.AcceptTcpClient();
+          //          clientRead = _listenerRead.AcceptTcpClient();
           // Работа с клиентом
-
-          
           EnsureConnected();
+
           streamRead = clientRead.GetStream();
+
 
           var lengthBytes = new byte[4];
           // ReSharper disable once UnusedVariable
@@ -190,17 +204,32 @@ public class TcpDuplex:IDisposable
             totalRead += read;
           }
 
+          if (totalRead <= 0)
+          {
+            indRepeatNull -= 1;
+            Thread.Sleep(200);
+            if (indRepeatNull < 0)
+            {
+
+              indRepeatNull = 10;
+              streamRead?.Close();
+              clientRead?.Close();
+            }
+            continue;
+          }
+          else
+            indRepeatNull = 10;
 
           // Отправка данных
-//          streamRead.Write(data, 0, data.Length);
+          //          streamRead.Write(data, 0, data.Length);
 
           // Чтение ответа (пример)
-//          byte[] buffer = new byte[1024];
+          //          byte[] buffer = new byte[1024];
           //int bytesRead = streamRead.Read(buffer, 0, buffer.Length);
           // ... обработка ответа
-        
 
-        var ok = "not";
+
+          var ok = "not";
           var yamlString = Encoding.UTF8.GetString(buffer);
           if (ParserReadString(yamlString))
             ok = "ok";
@@ -230,6 +259,12 @@ public class TcpDuplex:IDisposable
       {
         Console.WriteLine($"Ошибка при работе с потоком: {ex.Message}");
         EnsureConnected(); // Попытка переподключения при ошибке
+      }
+      finally
+      {
+        // Важно! Закрываем ресурсы
+        streamRead?.Dispose();
+        clientRead?.Dispose();
       }
 
 

@@ -11,8 +11,8 @@ string _pathYaml = "E:\\C#\\OpenCLDeskTop\\Core\\DeskTop\\ipAddresses.yaml";
 
 
 var _all = new AllTcp(_pathYaml);
-Thread.Sleep(200000); // Даем серверу время запуститься
-
+Thread.Sleep(2000000); // Даем серверу время запуститься
+int iii = 1;
 _all.Dispose();
 
 
