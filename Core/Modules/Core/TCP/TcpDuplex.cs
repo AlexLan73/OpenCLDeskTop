@@ -1,4 +1,6 @@
-﻿using System.Windows.Forms;
+﻿using Microsoft.AspNetCore.DataProtection;
+using System.Net.Sockets;
+using System.Windows.Forms;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace Modules.Core.TCP;
@@ -21,6 +23,11 @@ public class TcpDuplex:IDisposable
   private readonly ManualResetEvent _waitHandle = new ManualResetEvent(false);
   public IpAddressOne IpAddress { get; private set; }
   private Func<string, bool> _parserExternalFunction;
+
+  private TcpClient clientRead; //= _listenerRead.AcceptTcpClient();
+  // Работа с клиентом
+  private NetworkStream streamRead; // = clientRead.GetStream();
+
   public TcpDuplex(IpAddressOne ipAddress)
   {
     IpAddress = ipAddress;
@@ -45,6 +52,13 @@ public class TcpDuplex:IDisposable
 
     _cts = new CancellationTokenSource();
     _token = _cts.Token;
+
+    _listenerRead.Start();
+
+//    clientRead = _listenerRead.AcceptTcpClient();
+  // Работа с клиентом
+//    streamRead = clientRead.GetStream();
+
   }
   public void TestSendCommand(myMessage message)
   {
@@ -89,20 +103,31 @@ public class TcpDuplex:IDisposable
     return true;
   }
 
+  private void reconnect()
+  {
+    clientRead = _listenerRead.AcceptTcpClient();
+    // Работа с клиентом
+    streamRead = clientRead.GetStream();
+
+  }
+
   public void RunRead()
   {
     Console.WriteLine($"start  Port: {IpAddress.Port1};   Name: {IpAddress.Name}");
 
     TaskRead =  Task.Run(() =>
     {
-      _listenerRead.Start();
       try
       {
+        clientRead = _listenerRead.AcceptTcpClient();
+        // Работа с клиентом
+//        streamRead = clientRead.GetStream();
+
         while (!_token.IsCancellationRequested)
         {
-          using var clientRead = _listenerRead.AcceptTcpClient();
+//          clientRead = _listenerRead.AcceptTcpClient();
           // Работа с клиентом
-          using var streamRead = clientRead.GetStream();
+          streamRead = clientRead.GetStream();
 
           var lengthBytes = new byte[4];
           // ReSharper disable once UnusedVariable
@@ -115,13 +140,27 @@ public class TcpDuplex:IDisposable
           while (totalRead < messageLength)
           {
             var read = streamRead.Read(buffer, totalRead, messageLength - totalRead);
-            if (read == 0)
-            {
-              //throw new Exception("Disconnected");
-              break;
-            }
+            //if (read == 0)
+            //{
+            //  //throw new Exception("Disconnected");
+            //  break;
+            //}
             totalRead += read;
           }
+
+          //byte[] lengthBytes = new byte[4];
+          //socket.Receive(lengthBytes, 4, SocketFlags.None);
+          //uint netLength = BitConverter.ToUInt32(lengthBytes, 0);
+
+          //byte[] buffer = new byte[netLength];
+          //int received = 0;
+          //while (received < netLength)
+          //{
+          //  received += socket.Receive(buffer, received, (int)(netLength - received), SocketFlags.None);
+          //}
+          //string data = Encoding.UTF8.GetString(buffer);
+
+
 
           var ok = "not";
           var yamlString = Encoding.UTF8.GetString(buffer);
@@ -146,6 +185,7 @@ public class TcpDuplex:IDisposable
       }
       catch (ObjectDisposedException)
       {
+        reconnect();
         // Слушатель уничтожен, выходим из цикла
       }
 
@@ -222,52 +262,181 @@ public class TcpDuplex:IDisposable
   }
   public void RunSend()
   {
-    TaskSend = Task.Run(() =>
-    {
-      var repeatQueueRead = 3;
-      while (!_token.IsCancellationRequested)
-      {
-        _waitHandle.WaitOne(1000);
 
-        if(!_queueSend.IsEmpty)
-        {
-          if (!ConnectSend())
-          {
-            Console.WriteLine("Не удалось подключиться к серверу");
-            return Task.CompletedTask;
-          }
-        }
+    //Console.WriteLine($"start  Port: {IpAddress.Port1};   Name: {IpAddress.Name}");
 
-        while (!_queueSend.IsEmpty)
-        {
-          var errorCode = SendMessage();
-          switch (errorCode)
-          {
-            case -1:
-              if (!ConnectSend())
-              {
-                Console.WriteLine("Не удалось подключиться к серверу");
-                return Task.CompletedTask;
-              }
-              break;
-            case -2:
-              // проблема с очередью не читается
-              // послать сообщение c кол-вом оставшихся попыток
-              repeatQueueRead -= 1;
-              if (repeatQueueRead <= 0)
-              {
-                _queueSend.Clear();
-                repeatQueueRead = 3;
-              }
-              break;
-          }
-        }
-      }
-      return Task.CompletedTask;
-    }, _token);
+    //TaskRead = Task.Run(async () =>
+    //{
+    //  _listenerRead.Start();
 
-    //    client1.Close();
-    Console.WriteLine("Client finished.");
+    //  try
+    //  {
+    //    while (!_token.IsCancellationRequested)
+    //    {
+    //      using var clientRead = await _listenerRead.AcceptTcpClientAsync(_token);
+    //      using var streamRead = clientRead.GetStream();
+
+    //      // Читаем длину сообщения (4 байта)
+    //      var lengthBytes = new byte[4];
+    //      int readBytes = await streamRead.ReadAsync(lengthBytes, 0, 4, _token);
+    //      if (readBytes < 4) continue; // или обработать ошибку
+
+    //      int messageLength = BitConverter.ToInt32(lengthBytes, 0);
+    //      if (messageLength <= 0) continue;
+
+    //      // Читаем YAML-сообщение полностью
+    //      var buffer = new byte[messageLength];
+    //      int totalRead = 0;
+    //      while (totalRead < messageLength)
+    //      {
+    //        int bytesRead = await streamRead.ReadAsync(buffer, totalRead, messageLength - totalRead, _token);
+    //        if (bytesRead == 0) break; // Клиент отключился
+    //        totalRead += bytesRead;
+    //      }
+    //      if (totalRead < messageLength) continue; // Сообщение неполное
+
+    //      //byte[] lengthBytes = new byte[4];
+    //      //socket.Receive(lengthBytes, 4, SocketFlags.None);
+    //      //uint netLength = BitConverter.ToUInt32(lengthBytes, 0);
+
+    //      //byte[] buffer = new byte[netLength];
+    //      //int received = 0;
+    //      //while (received < netLength)
+    //      //{
+    //      //  received += socket.Receive(buffer, received, (int)(netLength - received), SocketFlags.None);
+    //      //}
+    //      //string data = Encoding.UTF8.GetString(buffer);
+
+
+
+    //      /////////////////
+    //      /*
+
+    //      byte[] lengthBytes = new byte[4];
+    //         socket.Receive(lengthBytes, 4, SocketFlags.None);
+    //         uint netLength = BitConverter.ToUInt32(lengthBytes, 0);
+
+    //         byte[] buffer = new byte[netLength];
+    //         int received = 0;
+    //         while (received < netLength)
+    //         {
+    //             received += socket.Receive(buffer, received, (int)(netLength - received), SocketFlags.None);
+    //         }
+    //         string data = Encoding.UTF8.GetString(buffer);
+
+
+    //      4. Проверить reconnect()
+    //         Убедитесь, что reconnect() действительно переподключает сокет:
+
+    //         cpp
+    //         void reconnect() {
+    //             if (socket_.is_open()) {
+    //                 socket_.close();  // Закрываем старое соединение
+    //             }
+    //             boost::system::error_code ec;
+    //             socket_.connect(endpoint_, ec);  // Пытаемся подключиться заново
+    //             if (ec) {
+    //                 std::cerr << "Reconnect failed: " << ec.message() << "\n";
+    //             }
+    //         }
+    //         5. Логировать ошибки точнее
+    //         Замените общий catch на более детальный:
+
+    //         cpp
+    //         catch (const boost::system::system_error& e) {
+    //             std::cerr << "Boost error: " << e.what() << " (code: " << e.code() << ")\n";
+    //             reconnect();
+    //         }
+    //         catch (const std::exception& e) {
+    //             std::cerr << "General error: " << e.what() << "\n";
+    //             reconnect();
+    //         }
+
+
+
+    //      */
+
+    //      var yamlString = Encoding.UTF8.GetString(buffer);
+
+    //      var ok = ParserReadString(yamlString) ? "ok" : "not";
+
+    //      var responseYaml = _serializer.Serialize(ok);
+    //      var responseBytes = Encoding.UTF8.GetBytes(responseYaml);
+    //      var responseLengthBytes = BitConverter.GetBytes(responseBytes.Length);
+
+    //      await streamRead.WriteAsync(responseLengthBytes, 0, 4, _token);
+    //      await streamRead.WriteAsync(responseBytes, 0, responseBytes.Length, _token);
+    //    }
+    //  }
+    //  catch (OperationCanceledException)
+    //  {
+    //    // Ожидаемое завершение по токену отмены
+    //  }
+    //  catch (SocketException)
+    //  {
+    //    Console.WriteLine($"Listener stopped on Port: {IpAddress.Port1}; Name: {IpAddress.Name}");
+    //  }
+    //  catch (ObjectDisposedException)
+    //  {
+    //    // Listener уничтожен, выход
+    //  }
+    //  finally
+    //  {
+    //    _listenerRead.Stop();
+    //    Console.WriteLine($"STOP  Port: {IpAddress.Port1};   Name: {IpAddress.Name}");
+    //  }
+    //}, _token);
+
+    /////////////////////////////////////////////////////////////////////////////////////////////////
+    ////TaskSend = Task.Run(() =>
+    ////{
+    ////  var repeatQueueRead = 3;
+    ////  while (!_token.IsCancellationRequested)
+    ////  {
+    ////    _waitHandle.WaitOne(1000);
+
+    ////    if(!_queueSend.IsEmpty)
+    ////    {
+    ////      if (!ConnectSend())
+    ////      {
+    ////        Console.WriteLine("Не удалось подключиться к серверу");
+    ////        return Task.CompletedTask;
+    ////      }
+    ////    }
+
+    ////    while (!_queueSend.IsEmpty)
+    ////    {
+    ////      var errorCode = SendMessage();
+    ////      switch (errorCode)
+    ////      {
+    ////        case -1:
+    ////          if (!ConnectSend())
+    ////          {
+    ////            Console.WriteLine("Не удалось подключиться к серверу");
+    ////            return Task.CompletedTask;
+    ////          }
+    ////          break;
+    ////        case -2:
+    ////          // проблема с очередью не читается
+    ////          // послать сообщение c кол-вом оставшихся попыток
+    ////          repeatQueueRead -= 1;
+    ////          if (repeatQueueRead <= 0)
+    ////          {
+    ////            _queueSend.Clear();
+    ////            repeatQueueRead = 3;
+    ////          }
+    ////          break;
+    ////      }
+    ////    }
+    ////  }
+    ////  return Task.CompletedTask;
+    ////}, _token);
+
+    //////    client1.Close();
+    ////Console.WriteLine("Client finished.");
+    //////////////////////////////////////////////////////////////////////////////////////////////////
+
+
   }
   public void Dispose()
   {
