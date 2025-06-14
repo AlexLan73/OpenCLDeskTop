@@ -10,16 +10,43 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using Common.Core;
+using Common.Core.Property;
+using DryIoc.FastExpressionCompiler.LightExpression;
+using Modules.Core;
+using Modules.Core.TCP;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
-Console.WriteLine("Test Server - SEND 127.0.0.1 port 20010");
 
-IPAddress localIP = IPAddress.Parse("127.0.0.1");
-int recPort = 20011; // фиксированный исходящий порт клиента
+Console.WriteLine("Test  ПЕРЕДАЧА НА СЕРВЕР ");
 
-IPAddress serverIP = IPAddress.Parse("127.0.0.1");
-int sendPort = 20010;
+string _pathYaml = "E:\\C#\\OpenCLDeskTop\\Core\\DeskTop\\ipAddresses.yaml";
+
+var _dIp = new ReadWriteYaml(_pathYaml).ReadYaml();
+IpAddressOne _ipAddressOne = _dIp[0];
+(_ipAddressOne.Port1, _ipAddressOne.Port2) = (_ipAddressOne.Port2, _ipAddressOne.Port1);
+
+Console.WriteLine($"Test Server - SEND {_ipAddressOne.IpAddress} port: {_ipAddressOne.Port1}");
+
+var _tcpDoplex = new TcpDuplex(_ipAddressOne);
+
+
+_tcpDoplex.RunSend();
+Thread.Sleep(20); // Даем серверу время запуститься
+_tcpDoplex.TestSendCommand(new myMessage() { Text = "START -1 ", Number = 101 });
+Thread.Sleep(500); // Даем серверу время запуститься
+_tcpDoplex.TestSendCommand(new myMessage() { Text = "START -2", Number = 102 });
+Thread.Sleep(1000); // Даем серверу время запуститься
+_tcpDoplex.TestSendCommand(new myMessage() { Text = "START -3", Number = 103 });
+Thread.Sleep(200); // Даем серверу время запуститься
+_tcpDoplex.TestSendCommand(new myMessage() { Text = "START -4", Number = 104 });
+
+
+Thread.Sleep(2000000); // Даем серверу время запуститься
+
+_tcpDoplex.Dispose();
+
 
 /*
 var serverThread = new System.Threading.Thread(TcpYamlServer.Run);
@@ -27,7 +54,7 @@ serverThread.Start();
 
 System.Threading.Thread.Sleep(500); // Даем серверу время запуститься
 */
-TcpYamlClient.Run();
+//TcpYamlClient.Run();
 
 //serverThread.Join();
 
@@ -98,59 +125,59 @@ class TcpYamlServer
 }
 */
 
-class TcpYamlClient
-{
-  public static void Run()
-  {
-    var deserializer = new DeserializerBuilder()
-        .WithNamingConvention(CamelCaseNamingConvention.Instance)
-        .Build();
-    var serializer = new SerializerBuilder()
-        .WithNamingConvention(CamelCaseNamingConvention.Instance)
-        .Build();
+//class TcpYamlClient
+//{
+//  public static void Run()
+//  {
+//    var deserializer = new DeserializerBuilder()
+//        .WithNamingConvention(CamelCaseNamingConvention.Instance)
+//        .Build();
+//    var serializer = new SerializerBuilder()
+//        .WithNamingConvention(CamelCaseNamingConvention.Instance)
+//        .Build();
 
-    var client = new TcpClient();
-    client.Connect(IPAddress.Loopback, 20010);
-    using var stream = client.GetStream();
+//    var client = new TcpClient();
+//    client.Connect(IPAddress.Loopback, 20010);
+//    using var stream = client.GetStream();
 
-    var message = new Message { Text = "start", Number = 0 };
+//    var message = new Message { Text = "start", Number = 0 };
 
-    for (int i = 0; i < 10; i++)
-    {
-      var yamlToSend = serializer.Serialize(message);
-      var bytesToSend = Encoding.UTF8.GetBytes(yamlToSend);
+//    for (int i = 0; i < 10; i++)
+//    {
+//      var yamlToSend = serializer.Serialize(message);
+//      var bytesToSend = Encoding.UTF8.GetBytes(yamlToSend);
 
-      // Отправляем длину сообщения (4 байта) и само сообщение
-      var lengthBytes = BitConverter.GetBytes(bytesToSend.Length);
-      stream.Write(lengthBytes, 0, 4);
-      stream.Write(bytesToSend, 0, bytesToSend.Length);
-      Console.WriteLine($"Sent: Text='{message.Text}', Number={message.Number}");
+//      // Отправляем длину сообщения (4 байта) и само сообщение
+//      var lengthBytes = BitConverter.GetBytes(bytesToSend.Length);
+//      stream.Write(lengthBytes, 0, 4);
+//      stream.Write(bytesToSend, 0, bytesToSend.Length);
+//      Console.WriteLine($"Sent: Text='{message.Text}', Number={message.Number}");
 
-      // Читаем длину ответа
-      var responseLengthBytes = new byte[4];
-      stream.Read(responseLengthBytes, 0, 4);
-      int responseLength = BitConverter.ToInt32(responseLengthBytes, 0);
+//      // Читаем длину ответа
+//      var responseLengthBytes = new byte[4];
+//      stream.Read(responseLengthBytes, 0, 4);
+//      int responseLength = BitConverter.ToInt32(responseLengthBytes, 0);
 
-      // Читаем YAML-ответ
-      var buffer = new byte[responseLength];
-      int totalRead = 0;
-      while (totalRead < responseLength)
-      {
-        int read = stream.Read(buffer, totalRead, responseLength - totalRead);
-        if (read == 0) throw new Exception("Disconnected");
-        totalRead += read;
-      }
+//      // Читаем YAML-ответ
+//      var buffer = new byte[responseLength];
+//      int totalRead = 0;
+//      while (totalRead < responseLength)
+//      {
+//        int read = stream.Read(buffer, totalRead, responseLength - totalRead);
+//        if (read == 0) throw new Exception("Disconnected");
+//        totalRead += read;
+//      }
 
-      var yamlReceived = Encoding.UTF8.GetString(buffer);
-      message = deserializer.Deserialize<Message>(yamlReceived);
-      message.Text += " !!-client";
-      message.Number += 1;
+//      var yamlReceived = Encoding.UTF8.GetString(buffer);
+//      message = deserializer.Deserialize<Message>(yamlReceived);
+//      message.Text += " !!-client";
+//      message.Number += 1;
 
-      Console.WriteLine($"Received: Text='{message.Text}', Number={message.Number}");
-    }
+//      Console.WriteLine($"Received: Text='{message.Text}', Number={message.Number}");
+//    }
 
-    client.Close();
-    Console.WriteLine("Client finished.");
-  }
-}
+//    client.Close();
+//    Console.WriteLine("Client finished.");
+//  }
+//}
 
