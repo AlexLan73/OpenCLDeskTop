@@ -1,0 +1,17 @@
+﻿syntax = "proto3";
+
+option csharp_namespace = "GrpcService1";
+
+
+service VectorService {
+  // Клиент подключается, сервер отправляет вектор, клиент возвращает модифицированный
+  rpc ProcessVector (stream VectorRequest) returns (stream VectorResponse);
+}
+
+message VectorRequest {
+  repeated int32 numbers = 1;  // "repeated" для массивов/списков
+}
+
+message VectorResponse {
+  repeated int32 modified_numbers = 1;
+}

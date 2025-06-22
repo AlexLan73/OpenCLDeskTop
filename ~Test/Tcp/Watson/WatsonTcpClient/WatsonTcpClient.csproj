@@ -8,12 +8,18 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="YamlDotNet" Version="16.3.0" />
+    <PackageReference Include="WatsonTcp" Version="6.0.10" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\Core\Common\Common.csproj" />
+    <ProjectReference Include="..\..\..\..\Core\Modules\Modules.csproj" />
+  </ItemGroup>
+
+  <!--
   <ItemGroup>
     <ProjectReference Include="..\..\Core\Common\Common.csproj" />
     <ProjectReference Include="..\..\Core\Modules\Modules.csproj" />
   </ItemGroup>
-
+-->
 </Project>

@@ -12,3 +12,7 @@ public static class FileNameConstant
   public const string ActiveA2LHex = "TestOpenCL.yaml";
 }
 
+public static class TypeClassWeUse
+{
+
+}
