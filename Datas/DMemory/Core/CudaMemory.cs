@@ -36,23 +36,43 @@ public class CudaMemory
 
   }
 
-  private void CallbackCommandDatAction(string st)
+/*
+   private void CallbackCommandDatAction(RecDataMetaData dMetaData)
+   {
+
+
+     Task.Run(() =>
+     {
+       var v = dMetaData;
+       var dMeta = v.MetaData;
+       if (v.Bytes.Sum(x => x) != long.Parse(dMeta["control_sum"]))
+       {
+         throw new MyException("Error in memory sum bytes", -34);
+         return;
+       }
+       var typeName = dMeta["type"];
+
+ 
+ */
+  private void CallbackCommandDatAction(RecDataMetaData dMetaData)
   {
+    if (dMetaData == null)
+      return;
+    // Здесь нужно писать в очередь
+
     Task.Run(() =>
     {
-      //     Например: 21.06.2025 22:01:00.333    "yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fffffffzzz". Например, 2015-07-17T17:04:43.4092892+03:00
-      string format = "HH':'mm':'ss'.'fff";
-
-    var mas = _ideserializer.Deserialize<Dictionary<string, string>>(st);
-      var size = Convert.ToInt32(mas["size"]);
-      var bytes = _memory.ReadMemoryData(size);
-      long sum = bytes.Sum(x => x);
-      if (bytes.Sum(x => x) != long.Parse(mas["control_sum"]))
+      var v = dMetaData;
+      var dMeta = v.MetaData;
+      if (!dMeta.ContainsKey("control_sum") || v.Bytes.Sum(x => x) != long.Parse(dMeta["control_sum"]))
       {
         throw new MyException("Error in memory sum bytes", -34);
         return;
       }
-      var typeName = mas["type"];
+      var typeName = dMeta["type"];
+
+      //     Например: 21.06.2025 22:01:00.333    "yyyy'-'MM'-'dd' 'HH':'mm':'ss'.'fffffffzzz". Например, 2015-07-17T17:04:43.4092892+03:00
+      string format = "HH':'mm':'ss'.'fff";
 
       try
       {
@@ -60,17 +80,17 @@ public class CudaMemory
         {
           case not null when typeName == MemStatic.StCudaTemperature:  //_cudaTemperature:
           {
-            _temperature = MessagePackSerializer.Deserialize<CudaTemperature>(bytes);
+            _temperature = MessagePackSerializer.Deserialize<CudaTemperature>(v.Bytes);
             CudaDtTemperature _CudaDtTemp = new CudaDtTemperature(
               DateTime.ParseExact(_temperature.Dt, format, CultureInfo.InvariantCulture), _temperature.Temp);
             break;
           }
           case not null when typeName == MemStatic.StArrCudaTemperature:  //_arrCudaTemperature:
           {
-              _temperatureArr = MessagePackSerializer.Deserialize<CudaTemperature[]>(bytes);
+            _temperatureArr = MessagePackSerializer.Deserialize<CudaTemperature[]>(v.Bytes);
             List<CudaDtTemperature> _lsCudaDtTemp = _temperatureArr.Select(x => 
-              new CudaDtTemperature(DateTime.ParseExact(x.Dt, format, CultureInfo.InvariantCulture) ,x.Temp)).ToList();
-
+                new CudaDtTemperature(DateTime.ParseExact(x.Dt, format, CultureInfo.InvariantCulture) ,x.Temp)).ToList();
+            PrintCudaTemperatures(_temperatureArr);
             break;
           }
         }
@@ -111,8 +131,40 @@ public class CudaMemory
     dict.TryAdd("control_sum", sumByte.ToString());
     string sd = dict.ToString();
     string yamlString = _iserializer.Serialize(dict);
-    _memory.CommandControl(yamlString);
+    _memory.CommandControl(dict);
   }
+
+  public static void PrintCudaTemperatures(CudaTemperature[] temperatures)
+  {
+    if (temperatures == null || temperatures.Length == 0)
+    {
+      Console.WriteLine("No temperature data available");
+      return;
+    }
+
+    // Вариант 1: Простой вывод
+    Console.WriteLine("Temperature Data:");
+    Console.WriteLine("----------------");
+    foreach (var temp in temperatures)
+    {
+      Console.WriteLine($"Date: {temp.Dt}, Temperature: {temp.Temp}°C");
+    }
+
+    // Вариант 2: Табличный вывод
+    Console.WriteLine("\nFormatted Table:");
+    Console.WriteLine("| {0,-20} | {1,-10} |", "Date", "Temperature");
+    Console.WriteLine("|{0}|{1}|", new string('-', 22), new string('-', 12));
+    foreach (var temp in temperatures)
+    {
+      Console.WriteLine("| {0,-20} | {1,-10:F2} |", temp.Dt, temp.Temp);
+    }
+
+    // Вариант 3: JSON-вывод (для логов)
+    Console.WriteLine("\nJSON Format:");
+    Console.WriteLine(MessagePackSerializer.ConvertToJson(MessagePackSerializer.Serialize(temperatures)));
+  }
+
+
 }
 
 

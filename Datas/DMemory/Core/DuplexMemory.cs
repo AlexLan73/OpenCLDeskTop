@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -23,12 +24,12 @@ public class DuplexMemory
   public ServerClient ServerClient { get; }
   private readonly MemoryBase _memoryWrite;
   private readonly MemoryBase _memoryRead;
-  private Action<string> setCommandControl=null;
+  private Action<Dictionary<string, string>> setCommandControl=null;
   private Action<byte[]> actionWriteByteData = null;
   private Func<int, byte[]> funcReadByteData = null;
 
 
-  public DuplexMemory(string nameMemory, ServerClient serverClient, Action<string> callBackCommandControl)
+  public DuplexMemory(string nameMemory, ServerClient serverClient, Action<RecDataMetaData> callBackCommandControl)
   {
     NameMemory = nameMemory;
     ServerClient = serverClient;
@@ -54,10 +55,15 @@ public class DuplexMemory
 
   }
 
-  public void CommandControl(string command) => setCommandControl(command);
+  public void CommandControl(Dictionary<string, string>  command) => setCommandControl(command);
   public byte[] ReadMemoryData(int count) => funcReadByteData(count);
   public void WriteDataToMwmory(byte[] bytes) => actionWriteByteData(bytes);
 
-
+  public DateTime ParseCudaDate(string dateString)
+  {
+    // "format" должен быть определен в вашем классе
+    const string format = "yyyy.MM.dd HH:mm:ss.fff";
+    return DateTime.ParseExact(dateString, format, CultureInfo.InvariantCulture);
+  }
 }
 

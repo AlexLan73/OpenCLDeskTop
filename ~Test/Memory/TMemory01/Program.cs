@@ -46,7 +46,10 @@ void TestTaskDataControl()
     using var memoryWrite = new MemoryBase("MyCUDA", TypeBlockMemory.Write, ReceiveCallback);
 
     // Отправляем первое сообщение
-    memoryWrite.SetCommandControl("Memory test 01");
+    Dictionary<string, string> map = new();
+    map.TryAdd("message", "Test Memory canals 1");
+    map.TryAdd("size", "0");
+    memoryWrite.SetCommandControl(map);
     Console.WriteLine("Отправлено: Memory test 01");
 
     // Ждем ответа
@@ -55,9 +58,24 @@ void TestTaskDataControl()
     Console.WriteLine("Нажмите Enter для выхода...");
     Console.ReadLine();
 
-    void ReceiveCallback(string message)
+    void ReceiveCallback(RecDataMetaData? message)
     {
-      Console.WriteLine($" TASK 0   Получен ответ: {message}");
+      if(message == null || message.MetaData == null || !message.MetaData.Any()) 
+        return;
+      var meta = message.MetaData;
+
+      if (meta.TryGetValue("message", out var vMes))
+      {
+        Console.WriteLine($" TASK 0   Получен ответ: {vMes}");
+        return;
+      }
+      if (meta.TryGetValue("type", out var vType))
+      {
+        Console.WriteLine($" TASK 0   Получен ответ: {vMes}");
+        return;
+      }
+
+      Console.WriteLine($" TASK 0   Получен ответ: {message.ToString()}");
     }
 
   });
@@ -73,20 +91,30 @@ void TestTaskDataControl()
     Console.WriteLine("Ожидаем сообщения TASK 1...");
     Console.ReadLine();
 
-    void ProcessMessage(string message)
+
+
+    void ProcessMessage(RecDataMetaData dMetaData)
     {
-      Console.WriteLine($"Получено сообщение: {message}");
+      if (dMetaData==null || dMetaData.MetaData == null || dMetaData.MetaData.Count()<0) 
+        return;
+      var v = dMetaData.MetaData;
+      if(v.TryGetValue("message", out var vMessedg))
+        Console.WriteLine($"Получено сообщение: {vMessedg}");
 
       // Создаем временный экземпляр для ответа
       using var memoryResponse = new MemoryBase("MyCUDA", TypeBlockMemory.Write);
 
       // Формируем и отправляем ответ
-      string response = $"{message} == Return ALL OK!!! == ";
-      memoryResponse.SetCommandControl(response);
+      string response = $"{vMessedg} == Return ALL OK!!! == ";
+      Dictionary<string, string> map = new();
+      map.TryAdd("message", "Test Memory canals 1 "+ response);
+      map.TryAdd("size", "0");
+
+      memoryResponse.SetCommandControl(map);
       Console.WriteLine($"Отправлен ответ: {response}");
     }
-
   });
+
 
   _task1.Wait();
   _task0.Wait();
@@ -94,7 +122,8 @@ void TestTaskDataControl()
 }
 
 // 1. Определяем record с атрибутами MessagePack
-[MessagePackObject]
+
+    [MessagePackObject]
 public record UserRecord(
   [property: Key(0)] int Id,
   [property: Key(1)] string Username

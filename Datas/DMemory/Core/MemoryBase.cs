@@ -1,9 +1,10 @@
-﻿using MessagePack;
+﻿using DMemory.Constants;
+using MessagePack;
+using System.Collections.Generic;
 using System.IO.MemoryMappedFiles;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using DMemory.Constants;
 
 
 namespace DMemory.Core;
@@ -19,12 +20,11 @@ public class MemoryBase :IDisposable
   private readonly MemoryMappedFile _mmDataControl;
   private MemoryMappedFile _mmData;
   
-  private readonly Action<string> _callBack = delegate { }; // Инициализация пустым делегатом
+  private readonly Action<RecDataMetaData> _callBack = delegate { }; // Инициализация пустым делегатом
   private readonly CancellationTokenSource _cts;
-  private readonly CancellationToken _token;
   private bool _disposed = false;
   private readonly object _syncLock = new object();
-  public MemoryBase(string nameMemory, TypeBlockMemory typeBlockMemory, Action<string> callBack=null)
+  public MemoryBase(string nameMemory, TypeBlockMemory typeBlockMemory, Action<RecDataMetaData> callBack=null)
   {
     NameMemoryData = nameMemory;
     NameMemoryDataControl = $"{NameMemoryData}Control";
@@ -44,17 +44,18 @@ public class MemoryBase :IDisposable
       _callBack = callBack;
 
     _cts = new CancellationTokenSource();
-    _token = _cts.Token;
+    var token = _cts.Token;
     if (typeBlockMemory == TypeBlockMemory.Read)
-      WaiteEventRead = WaitDataControlEventAsync(_token);
+      WaiteEventRead = WaitDataControlEventAsync(token);
   }
 
 /// <summary>
 /// Передаем командную строку для записи в раздел контроль и запускаем event
 /// </summary>
 /// <param name="sData"></param>
-  public void SetCommandControl(string sData)
+  public void SetCommandControl(Dictionary<string, string> dic)
   {
+    var sData = ConvertDictToString(dic);
     using (var accessor = _mmDataControl.CreateViewAccessor())
     {
       var data = Encoding.UTF8.GetBytes(sData);
@@ -86,12 +87,22 @@ public class MemoryBase :IDisposable
             var buffer = new byte[MemStatic.SizeDataControl];
             accessor.ReadArray(0, buffer, 0, buffer.Length);
             var received = Encoding.UTF8.GetString(buffer).TrimEnd('\0');
+            Console.WriteLine("Received WaitDataControlEventAsync: " + received);
 
             // Сбрасываем данные в памяти после чтения (опционально)
             accessor.WriteArray(0, new byte[MemStatic.SizeDataControl], 0, MemStatic.SizeDataControl);
 
-            Console.WriteLine("Received WaitDataControlEventAsync: " + received);
-            _callBack.Invoke(received);
+            var map = ConvertStringToDict(received);
+            if (map==null)
+            {
+              EventMemoryDataControl.Reset();
+              return;
+            }
+
+            var size = Convert.ToInt32(map["size"]);
+            var bytes = ReadMemoryData(size);
+
+            _callBack.Invoke(new RecDataMetaData(bytes, map));
           }
 
           // Для AutoReset режима это не обязательно, но для надежности:
@@ -102,7 +113,8 @@ public class MemoryBase :IDisposable
       {
         Console.WriteLine($"Ошибка в WaitDataControlEventAsync: {ex}");
         // Можно добавить уведомление об ошибке через callback
-        _callBack.Invoke($"ERROR: {ex.Message}");
+//        _callBack.Invoke($"ERROR: {ex.Message}");
+        _callBack.Invoke(null);
       }
     }, cancellationToken);
   }
@@ -131,6 +143,26 @@ public class MemoryBase :IDisposable
       throw;
     }
   }
+
+  public string ConvertDictToString(Dictionary<string, string> dic)
+  {
+    if (dic == null || !dic.Any())
+      return null;
+
+    return string.Join(";", dic.Select(x => $"{x.Key}={x.Value}")) + ";";
+  }
+
+  public Dictionary<string, string> ConvertStringToDict(string str)
+  {
+    if(string.IsNullOrEmpty(str))
+      return null;
+
+    return str.Split(';', StringSplitOptions.RemoveEmptyEntries)
+      .Select(s => s.Split('=', 2, StringSplitOptions.RemoveEmptyEntries))
+      .Where(parts => parts.Length == 2)
+      .ToDictionary(parts => parts[0], parts => parts[1]);
+  }
+
 
   // Запись данных в общую память
   public virtual void WriteByteData(byte[] bytes)

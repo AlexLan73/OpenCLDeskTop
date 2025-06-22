@@ -30,20 +30,23 @@ public class CudaClientTest
     _ideserializer = new DeserializerBuilder().Build();
   }
 
-  private void CallbackCommandDatAction(string st)
+  private void CallbackCommandDatAction(RecDataMetaData dMetaData)
   {
+    if (dMetaData==null)
+      return;
+    // Здесь нужно писать в очередь
+
+
     Task.Run(() =>
     {
-      var mas = _ideserializer.Deserialize<Dictionary<string, string>>(st);
-      var size = Convert.ToInt32(mas["size"]);
-      var bytes = _memory.ReadMemoryData(size);
-      long sum = bytes.Sum(x => x);
-      if (bytes.Sum(x => x) != long.Parse(mas["control_sum"]))
+      var v = dMetaData;
+      var dMeta = v.MetaData;
+      if (v.Bytes.Sum(x => x) != long.Parse(dMeta["control_sum"]))
       {
         throw new MyException("Error in memory sum bytes", -34);
         return;
       }
-      var typeName = mas["type"];
+      var typeName = dMeta["type"];
 
       try
       {
@@ -51,13 +54,14 @@ public class CudaClientTest
         {
           case not null when typeName == MemStatic.StCudaTemperature: // _cudaTemperature:
           {
-            _temperature = MessagePackSerializer.Deserialize<CudaTemperature>(bytes);
+            _temperature = MessagePackSerializer.Deserialize<CudaTemperature>(v.Bytes);
             break;
           }
           case not null when typeName == MemStatic.StArrCudaTemperature:
             {
-            _temperatureArr = MessagePackSerializer.Deserialize<CudaTemperature[]>(bytes);
-            break;
+            _temperatureArr = MessagePackSerializer.Deserialize<CudaTemperature[]>(v.Bytes);
+            CudaMemory. PrintCudaTemperatures(_temperatureArr);
+              break;
           }
         }
       }
@@ -101,8 +105,9 @@ public class CudaClientTest
     dict.TryAdd("control_sum", sumByte.ToString());
     string sd = dict.ToString();
 
-    string yamlString = _iserializer.Serialize(dict);
-    _memory.CommandControl(yamlString);
+//    string yamlString = _iserializer.Serialize(dict);
+    _memory.CommandControl(dict);
+
   }
 }
 
