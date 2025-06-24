@@ -11,30 +11,42 @@ using static System.Threading.Tasks.Task;
 
 Console.WriteLine("Тест памяти!");
 
-// 2. Создаем экземпляр record
-var user = new UserRecord(Id: 1, Username: "JohnDoe");
-// 3. Сериализуем в массив байт
-byte[] bytes = MessagePackSerializer.Serialize(user);
-Console.WriteLine($"Размер в байтах: {bytes.Length}");
-// 4. Десериализуем обратно в record
-UserRecord deserializedUser = MessagePackSerializer.Deserialize<UserRecord>(bytes);
-// 5. Проверяем, что данные восстановились корректно
-Console.WriteLine(deserializedUser); // Вывод: UserRecord { Id = 1, Username = JohnDoe }
-Console.WriteLine($"Объекты равны: {user == deserializedUser}"); // Вывод: true
+
+CudaMem _cudaMem = new CudaMem(ServerClient.Client);
+//CudaTest _cudaTest = new CudaTest(ServerClient.Server);
+//_cudaTest.TestData();
 
 
-CudaMemory _cuda = new CudaMemory();
-CudaClientTest _clientTest = new CudaClientTest();
-_clientTest.TestData();
-_cuda.TestDataMemory();
 
 
-Thread.Sleep(5000);
-int hh = 1;
+//Thread.Sleep(2000);
 Console.ReadLine();
+int hh = 1;
+
+_cudaMem.Dispose();
+//_cudaTest.Dispose();
+int mm = 1;
+//Console.ReadLine();
 
 
 
+
+
+
+//// 2. Создаем экземпляр record
+//var user = new UserRecord(Id: 1, Username: "JohnDoe");
+//// 3. Сериализуем в массив байт
+//byte[] bytes = MessagePackSerializer.Serialize(user);
+//Console.WriteLine($"Размер в байтах: {bytes.Length}");
+//// 4. Десериализуем обратно в record
+//UserRecord deserializedUser = MessagePackSerializer.Deserialize<UserRecord>(bytes);
+//// 5. Проверяем, что данные восстановились корректно
+//Console.WriteLine(deserializedUser); // Вывод: UserRecord { Id = 1, Username = JohnDoe }
+//Console.WriteLine($"Объекты равны: {user == deserializedUser}"); // Вывод: true
+
+////CudaMem _cudaMem = new CudaMem(ServerClient.Server);
+////CudaTest _cudaTest = new CudaTest(ServerClient.Client);
+////_cudaTest.TestData();
 
 void TestTaskDataControl()
 {

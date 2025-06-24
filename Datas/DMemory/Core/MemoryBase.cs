@@ -1,14 +1,12 @@
-﻿using DMemory.Constants;
-using MessagePack;
-using System.Collections.Generic;
-using System.IO.MemoryMappedFiles;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
+﻿
+
+using System.Diagnostics;
 
 
 namespace DMemory.Core;
 
+using System.Threading;
+using MapCommands = Dictionary<string, string>;
 
 public class MemoryBase :IDisposable
 {
@@ -16,44 +14,65 @@ public class MemoryBase :IDisposable
   private string NameMemoryDataControl { get;  }
   private string EventNameMemoryDataControl { get; }
   private EventWaitHandle EventMemoryDataControl { get; }
-  private Task WaiteEventRead { get; }
+  private Task _waiteEventRead;
   private readonly MemoryMappedFile _mmDataControl;
-  private MemoryMappedFile _mmData;
+//  private MemoryMappedFile _mmData;
   
-  private readonly Action<RecDataMetaData> _callBack = delegate { }; // Инициализация пустым делегатом
-  private readonly CancellationTokenSource _cts;
+  private Action<RecDataMetaData> _callBack = delegate { }; // Инициализация пустым делегатом
+  private CancellationTokenSource _cts;
   private bool _disposed = false;
+  private readonly TypeBlockMemory _typeBlockMemory;
   private readonly object _syncLock = new object();
-  public MemoryBase(string nameMemory, TypeBlockMemory typeBlockMemory, Action<RecDataMetaData> callBack=null)
+  private readonly MemoryMappedFile _mmData; // Убираем '?' - теперь он будет всегда инициализирован
+  private readonly long _dataSegmentSize; // Добавляем поле для хранения размера
+
+  public MemoryBase(string nameMemory, TypeBlockMemory typeBlockMemory, Action<RecDataMetaData> callBack=null,
+          long dataSegmentSize = MemStatic.SizeDataSegment)
   {
     NameMemoryData = nameMemory;
+    _typeBlockMemory = typeBlockMemory;
+    _dataSegmentSize = dataSegmentSize; // Сохраняем размер
+
     NameMemoryDataControl = $"{NameMemoryData}Control";
     EventNameMemoryDataControl = @$"Global\Event{NameMemoryData}";
 
     _mmDataControl = MemoryMappedFile.CreateOrOpen(NameMemoryDataControl, MemStatic.SizeDataControl);
-    _mmData =  MemoryMappedFile.CreateOrOpen(NameMemoryData, MemStatic.SizeDataControl);
+    // === ГЛАВНОЕ ИЗМЕНЕНИЕ: Инициализируем _mmData ЗДЕСЬ, ОДИН РАЗ ===
+    _mmData = MemoryMappedFile.CreateOrOpen(NameMemoryData, _dataSegmentSize);
+
     EventMemoryDataControl = new EventWaitHandle(
       false,
       EventResetMode.AutoReset,
       EventNameMemoryDataControl,
       out var createdNew
     );
-    Console.WriteLine(createdNew ? "Создано новое событие" : "Подключено к существующему событию");
+    Console.WriteLine(createdNew ? $"Создано новое событие {NameMemoryData}" : $"Подключено к существующему событию {NameMemoryData}");
 
-    if(callBack!=null)
-      _callBack = callBack;
+    if(callBack==null)
+      return;
+
+    InitializationCallBack(_callBack);
+  }
+
+  public void InitializationCallBack(Action<RecDataMetaData> callBack)
+  {
+    if (callBack == null)
+      return;
+
+    _callBack = callBack;
 
     _cts = new CancellationTokenSource();
     var token = _cts.Token;
-    if (typeBlockMemory == TypeBlockMemory.Read)
-      WaiteEventRead = WaitDataControlEventAsync(token);
+    if (_typeBlockMemory == TypeBlockMemory.Read)
+      _waiteEventRead = ReadDataCallBack(token);
+
   }
 
-/// <summary>
-/// Передаем командную строку для записи в раздел контроль и запускаем event
-/// </summary>
-/// <param name="sData"></param>
-  public void SetCommandControl(Dictionary<string, string> dic)
+  /// <summary>
+  /// Передаем командную строку для записи в раздел контроль и запускаем event
+  /// </summary>
+  /// <param name="sData"></param>
+  public void SetCommandControl(MapCommands dic)
   {
     var sData = ConvertDictToString(dic);
     using (var accessor = _mmDataControl.CreateViewAccessor())
@@ -63,14 +82,55 @@ public class MemoryBase :IDisposable
     }
     EventMemoryDataControl.Set();
   }
+  public MapCommands GetCommandControl()
+  {
+    // 1. Ожидание сигнала от записывающего процесса
+//    _eventMemoryDataControl.WaitOne();
 
+    using (var accessor = _mmDataControl.CreateViewAccessor())
+    {
+      // 2. Чтение данных
+      // Читаем все данные из памяти. Важно, чтобы размер буфера 
+      // был достаточным. accessor.Capacity предоставляет весь размер.
+      var data = new byte[accessor.Capacity];
+      accessor.ReadArray(0, data, 0, data.Length);
+
+      // Убираем "пустые" байты в конце, если строка была короче буфера
+      int actualLength = Array.FindLastIndex(data, b => b != 0) + 1;
+      if (actualLength == 0 && data[0] != 0) actualLength = data.Length; // Если весь массив заполнен
+      if (actualLength == 0) return new MapCommands(); // Память пуста
+
+      // 3. Декодирование из UTF8
+      var sData = Encoding.UTF8.GetString(data, 0, actualLength);
+
+      // 4. Десериализация строки обратно в словарь
+      return ConvertStringToDict(sData);
+    }
+  }
+
+  public void ClearCommandControl()
+  {
+    Trace.WriteLine("[Команда] Очистка разделяемой памяти...");
+
+    // 1. Получаем доступ к памяти
+    using (var accessor = _mmDataControl.CreateViewAccessor())
+    {
+      // 2. Записываем пустой массив байтов по всему объему памяти
+      accessor.WriteArray(0, MemStatic.EmptyBuffer, 0, MemStatic.SizeDataControl);
+    }
+
+    // 3. Подаем сигнал, чтобы "разбудить" всех ожидающих читателей
+    // Они проснутся и прочитают пустые данные.
+    Console.WriteLine("[Команда] Память очищена. Подаю сигнал.");
+   
+  }
   /// <summary>
   /// Постоянный цикл, проверяем событие на получение данных
   /// данные получены возвращает строку с данными для парсинга
   /// </summary>
   /// <param name="cancellationToken"></param>
   /// <returns></returns>
-  private async Task WaitDataControlEventAsync(CancellationToken cancellationToken = default)
+  private async Task ReadDataCallBack(CancellationToken cancellationToken = default)
   {
     await Task.Run(() =>
     {
@@ -87,7 +147,7 @@ public class MemoryBase :IDisposable
             var buffer = new byte[MemStatic.SizeDataControl];
             accessor.ReadArray(0, buffer, 0, buffer.Length);
             var received = Encoding.UTF8.GetString(buffer).TrimEnd('\0');
-            Console.WriteLine("Received WaitDataControlEventAsync: " + received);
+            Console.WriteLine("Received ReadDataCallBack: " + received);
 
             // Сбрасываем данные в памяти после чтения (опционально)
             accessor.WriteArray(0, new byte[MemStatic.SizeDataControl], 0, MemStatic.SizeDataControl);
@@ -111,48 +171,22 @@ public class MemoryBase :IDisposable
       }
       catch (Exception ex)
       {
-        Console.WriteLine($"Ошибка в WaitDataControlEventAsync: {ex}");
+        Console.WriteLine($"Ошибка в ReadDataCallBack: {ex}");
         // Можно добавить уведомление об ошибке через callback
 //        _callBack.Invoke($"ERROR: {ex.Message}");
         _callBack.Invoke(null);
       }
     }, cancellationToken);
   }
-  /// <summary>
-  /// Читаем из памяти данные в размере sizeData байт
-  /// </summary>
-  /// <param name="sizeData"></param>
-  /// Возвращает вектор байт  byte[]
-  public virtual byte[] ReadMemoryData(int sizeData)
-  {
 
-    if (sizeData <= 0)
-      throw new ArgumentException("Размер данных должен быть положительным");
-
-    try
-    {
-      _mmData = MemoryMappedFile.CreateOrOpen(NameMemoryData, sizeData);
-      using var accessor = _mmData.CreateViewAccessor();
-      var buffer = new byte[sizeData];
-      accessor.ReadArray(0, buffer, 0, buffer.Length);
-      return buffer;
-    }
-    catch (Exception ex)
-    {
-      Console.WriteLine($"Ошибка чтения из памяти: {ex}");
-      throw;
-    }
-  }
-
-  public string ConvertDictToString(Dictionary<string, string> dic)
+  public string ConvertDictToString(MapCommands dic)
   {
     if (dic == null || !dic.Any())
       return null;
 
     return string.Join(";", dic.Select(x => $"{x.Key}={x.Value}")) + ";";
   }
-
-  public Dictionary<string, string> ConvertStringToDict(string str)
+  public MapCommands ConvertStringToDict(string str)
   {
     if(string.IsNullOrEmpty(str))
       return null;
@@ -164,39 +198,68 @@ public class MemoryBase :IDisposable
   }
 
 
+  //////////////////////////////////////
   // Запись данных в общую память
   public virtual void WriteByteData(byte[] bytes)
   {
-    _mmData = MemoryMappedFile.CreateOrOpen(NameMemoryData, bytes.Length);
+    if (bytes.Length > _dataSegmentSize)
+    {
+      throw new ArgumentOutOfRangeException(nameof(bytes), $"Размер данных ({bytes.Length}) превышает выделенный сегмент памяти ({_dataSegmentSize}).");
+    }
+
+    // --- УДАЛЯЕМ ЭТУ СТРОКУ ---
+    // _mmData = MemoryMappedFile.CreateOrOpen(NameMemoryData, bytes.Length);
+
+    // Используем уже существующий _mmData
     using var accessor = _mmData.CreateViewAccessor();
     accessor.WriteArray(0, bytes, 0, bytes.Length);
   }
 
-  // Дополнительный метод для записи объектов (с сериализацией)
-  public void WriteObject<T>(T obj)
+  public virtual void WriteByteData(byte[] bytes, MapCommands map)
   {
-    if (obj == null)
-      throw new ArgumentNullException(nameof(obj));
+    if (bytes.Length > _dataSegmentSize)
+    {
+      throw new ArgumentOutOfRangeException(nameof(bytes), $"Размер данных ({bytes.Length}) превышает выделенный сегмент памяти ({_dataSegmentSize}).");
+    }
 
-    var bytes = MessagePackSerializer.Serialize(obj);
-    WriteByteData(bytes);
+    // --- УДАЛЯЕМ ЭТУ СТРОКУ ---
+    // _mmData = MemoryMappedFile.CreateOrOpen(NameMemoryData, bytes.Length);
+
+    using var accessor = _mmData.CreateViewAccessor();
+    accessor.WriteArray(0, bytes, 0, bytes.Length);
+    SetCommandControl(map);
   }
 
-  // Дополнительный метод для чтения объектов (с десериализацией)
-  public T ReadObject<T>(int bufferSize = 1024)
+  public virtual byte[] ReadMemoryData(int sizeData)
   {
-    var bytes = ReadMemoryData(bufferSize);
-    return MessagePackSerializer.Deserialize<T>(bytes);
+    if (sizeData <= 0)
+      throw new ArgumentException("Размер данных должен быть положительным");
+    if (sizeData > _dataSegmentSize)
+      throw new ArgumentOutOfRangeException(nameof(sizeData), $"Запрошенный размер ({sizeData}) превышает выделенный сегмент памяти ({_dataSegmentSize}).");
+
+    try
+    {
+      using var accessor = _mmData.CreateViewAccessor();
+      var buffer = new byte[sizeData];
+      accessor.ReadArray(0, buffer, 0, buffer.Length);
+      ClearCommandControl();
+      return buffer;
+    }
+    catch (Exception ex)
+    {
+      Console.WriteLine($"Ошибка чтения из памяти: {ex}");
+      throw;
+    }
   }
 
-  protected virtual void Dispose(bool disposing)
+  public virtual void Dispose(bool disposing)
   {
     if (_disposed) return;
 
     if (disposing)
     {
-      _cts.Cancel();
-      WaiteEventRead?.Wait(TimeSpan.FromSeconds(1)); // Ограниченное ожидание
+      _cts?.Cancel();
+      _waiteEventRead?.Wait(TimeSpan.FromSeconds(1)); // Ограниченное ожидание
       EventMemoryDataControl?.Dispose();
       _mmDataControl?.Dispose();
       _cts?.Dispose();
@@ -212,152 +275,3 @@ public class MemoryBase :IDisposable
 }
 
 
-
-
-
-//////////////////////////////////////////////////////
-/*
-using MessagePack;
-using System.Collections.Generic;
-using System.IO;
-
-var dict = new Dictionary<string, List<float>> {
-  { "a", new List<float> { 1.1f, 2.2f } },
-  { "b", new List<float> { 3.3f } }
-};
-byte[] bytes = MessagePackSerializer.Serialize(dict);
-File.WriteAllBytes("data.msgpack", bytes);
-
-// Десериализация
-var restored = MessagePackSerializer.Deserialize<Dictionary<string, List<float>>>(bytes);
-
-*/
-/*
-#include <msgpack.hpp>
-#include <fstream>
-#include <map>
-#include <vector>
-#include <string>
-
-int main()
-{
-  std::map < std::string, std::vector<float> > data = { { "a", { 1.1f, 2.2f} }, { "b", { 3.3f} } }
-  ;
-  std::stringstream buffer;
-  msgpack::pack(buffer, data);
-
-  // запись в файл
-  std::ofstream ofs("data.msgpack", std::ios::binary);
-  std::string const&str = buffer.str();
-  ofs.write(str.data(), str.size());
-  ofs.close();
-}
-
-*/
-
-
-/*
-public class SharedMemoryReader : IDisposable
-{
-  private MemoryMappedFile mmf;
-  private MemoryMappedViewAccessor accessor;
-  private EventWaitHandle notifyEvent;
-  private string memoryName;
-  private string eventName;
-  private int memorySize;
-
-  public SharedMemoryReader(string baseName, int blockIndex, int memorySize = 65536)
-  {
-    this.memoryName = $"{baseName}_{blockIndex}";
-    this.eventName = $"{baseName}_Event_{blockIndex}";
-    this.memorySize = memorySize;
-
-    try
-    {
-      mmf = MemoryMappedFile.OpenExisting(memoryName, MemoryMappedFileRights.ReadWrite);
-      accessor = mmf.CreateViewAccessor(0, memorySize);
-      notifyEvent = new EventWaitHandle(false, EventResetMode.AutoReset, eventName);
-    }
-    catch (Exception ex)
-    {
-      Dispose();
-      throw new Exception($"Failed to initialize shared memory block {blockIndex}", ex);
-    }
-  }
-
-  public string ReadData(int timeoutMs = 1000)
-  {
-    if (notifyEvent.WaitOne(timeoutMs))
-    {
-      byte[] buffer = new byte[memorySize];
-      accessor.ReadArray(0, buffer, 0, buffer.Length);
-      return System.Text.Encoding.UTF8.GetString(buffer).TrimEnd('\0');
-    }
-    return null;
-  }
-
-  public void Dispose()
-  {
-    accessor?.Dispose();
-    mmf?.Dispose();
-    notifyEvent?.Close();
-  }
-}
-
-class Program
-{
-  const int BLOCK_COUNT = 3;
-  const int MEM_SIZE = 65536; // 64KB
-
-  static void Main()
-  {
-    // Создаем читателей для каждого блока памяти
-    var readers = new SharedMemoryReader[BLOCK_COUNT];
-    for (int i = 0; i < BLOCK_COUNT; i++)
-    {
-      try
-      {
-        readers[i] = new SharedMemoryReader("Global\\SharedMemory", i, MEM_SIZE);
-        Console.WriteLine($"Initialized reader for block {i}");
-      }
-      catch (Exception ex)
-      {
-        Console.WriteLine($"Error initializing block {i}: {ex.Message}");
-        readers[i] = null;
-      }
-    }
-
-    try
-    {
-      while (true)
-      {
-        for (int i = 0; i < BLOCK_COUNT; i++)
-        {
-          if (readers[i] != null)
-          {
-            string data = readers[i].ReadData(500);
-            if (data != null)
-            {
-              Console.WriteLine($"[Block {i}] Received: {data}");
-            }
-          }
-        }
-        Thread.Sleep(100);
-      }
-    }
-    catch (Exception ex)
-    {
-      Console.WriteLine($"Error: {ex.Message}");
-    }
-    finally
-    {
-      // Освобождаем ресурсы
-      foreach (var reader in readers)
-      {
-        reader?.Dispose();
-      }
-    }
-  }
-}
-
-*/
