@@ -12,7 +12,7 @@ using static System.Threading.Tasks.Task;
 Console.WriteLine("Тест памяти!");
 
 
-CudaMem _cudaMem = new CudaMem(ServerClient.Client);
+CudaMem _cudaMem = new CudaMem(ServerClient.Server);
 //CudaTest _cudaTest = new CudaTest(ServerClient.Server);
 //_cudaTest.TestData();
 

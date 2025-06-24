@@ -47,7 +47,7 @@ public class CudaMem(ServerClient serverClient) : MemoryNome("Cuda", serverClien
                 new CudaDtTemperature(DateTime.ParseExact(x.Dt, format, CultureInfo.InvariantCulture), x.Temp)).ToList();
              CudaTest.PrintCudaTemperatures(temperatureArr);
              Trace.WriteLine(" ---  Server ==> SEND  ---  ");
-//              TestReturnData(temperatureArr);
+              TestReturnData(temperatureArr);
             break;
           }
         }
