@@ -1,9 +1,8 @@
-﻿
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
-namespace DMemory.Core;
+namespace DMemory.Core.Test;
 
-public class CudaMem(ServerClient serverClient) : MemoryNome("Cuda", serverClient)
+public class CudaMem01(ServerClient serverClient) : MemoryNome("Cuda", serverClient)
 {
   public override void CallbackCommandDatAction(RecDataMetaData dMetaData)
   {
@@ -45,7 +44,7 @@ public class CudaMem(ServerClient serverClient) : MemoryNome("Cuda", serverClien
             var temperatureArr = MessagePackSerializer.Deserialize<CudaTemperature[]>(v.Bytes);
             var lsCudaDtTemp = temperatureArr.Select(x =>
                 new CudaDtTemperature(DateTime.ParseExact(x.Dt, format, CultureInfo.InvariantCulture), x.Temp)).ToList();
-             CudaTest.PrintCudaTemperatures(temperatureArr);
+             CudaTest01.PrintCudaTemperatures(temperatureArr);
              Trace.WriteLine(" ---  Server ==> SEND  ---  ");
               TestReturnData(temperatureArr);
             break;

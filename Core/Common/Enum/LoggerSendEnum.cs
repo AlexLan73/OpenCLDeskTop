@@ -1,8 +1,8 @@
 ﻿namespace Common.Enum;
 public enum LoggerSendEnum
 {
-  Info,
-  Warning,
-  Error
+  Error = -1,
+  Info = 0,
+  Warning = 1
 }
 

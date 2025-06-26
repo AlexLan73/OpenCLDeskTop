@@ -2,6 +2,7 @@
 
 using Common.Enum;
 using DMemory.Core;
+using DMemory.Core.Test;
 using MessagePack;
 using System;
 using System;
@@ -12,7 +13,7 @@ using static System.Threading.Tasks.Task;
 Console.WriteLine("Тест памяти!");
 
 
-CudaMem _cudaMem = new CudaMem(ServerClient.Server);
+CudaMem01 _cudaMem = new CudaMem01(ServerClient.Server);
 //CudaTest _cudaTest = new CudaTest(ServerClient.Server);
 //_cudaTest.TestData();
 

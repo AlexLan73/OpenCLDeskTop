@@ -1,4 +1,6 @@
-﻿namespace DMemory.Constants;
+﻿using CudaTemperature = DMemory.Core.CudaTemperature;
+
+namespace DMemory.Constants;
 
 public static class MemStatic
 {

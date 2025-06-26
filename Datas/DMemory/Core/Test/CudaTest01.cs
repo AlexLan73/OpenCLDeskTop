@@ -1,8 +1,8 @@
 ﻿//using YamlDotNet.Serialization;
 
-namespace DMemory.Core;
+namespace DMemory.Core.Test;
 
-public class CudaTest : CudaMem
+public class CudaTest01 : CudaMem01
 {
   //private MemoryNome _memory;
   //string _nameTypeRecord;
@@ -11,7 +11,7 @@ public class CudaTest : CudaMem
   //private CudaTemperature _temperature;
   //private CudaTemperature[] _temperatureArr;
 
-  public CudaTest(ServerClient serverClient) : base(serverClient)
+  public CudaTest01(ServerClient serverClient) : base(serverClient)
   {
   }
 
