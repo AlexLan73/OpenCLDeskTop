@@ -69,7 +69,7 @@ public class ShellViewModel : VmReactiveNavigate
       : base(containerProvider, ea, regionManager)
     {
         CommandNavigate = ReactiveCommand.Create<string>(Navigate);
-        Title = "== НАМИ == ";
+        Title = "== АО НПОДАР == ";
     }
 
     internal void LoadWin(Shell shell)
