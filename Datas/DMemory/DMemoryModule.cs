@@ -1,19 +1,17 @@
-﻿using DMemory.Views;
-using Prism.Ioc;
+﻿using Prism.Ioc;
 using Prism.Modularity;
 
-namespace DMemory
+namespace DMemory;
+
+public class DMemoryModule : IModule
 {
-    public class DMemoryModule : IModule
-    {
-        public void OnInitialized(IContainerProvider containerProvider)
-        {
+  public void OnInitialized(IContainerProvider containerProvider)
+  {
 
-        }
+  }
 
-        public void RegisterTypes(IContainerRegistry containerRegistry)
-        {
+  public void RegisterTypes(IContainerRegistry containerRegistry)
+  {
 
-        }
-    }
+  }
 }
