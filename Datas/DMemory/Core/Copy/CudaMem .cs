@@ -1,8 +1,7 @@
-﻿
-using DMemory.Core.Test;
+﻿using DMemory.Core.Test;
 using System.Collections.Generic;
 
-namespace DMemory.Core;
+namespace DMemory.Core.Copy;
 
 public class CudaMem(ServerClient serverClient) : MemoryNome("Cuda", serverClient)
 {
@@ -70,70 +69,6 @@ public class CudaMem(ServerClient serverClient) : MemoryNome("Cuda", serverClien
     });
   }
 
-
-// ... (остальной код)
-
-
-     
-
-
-
-/*
-    if (dMetaData == null)
-      return;
-    // Здесь нужно писать в очередь
-
-    Task.Run(() =>
-    {
-      var v = dMetaData;
-      var dMeta = v.MetaData;
-
-      var v0 = v.Bytes.Sum(x => x);
-      var v1 = long.Parse(dMeta["control_sum"]);
-
-      //if (!dMeta.ContainsKey("control_sum") || v.Bytes.Sum(x => x) != long.Parse(dMeta["control_sum"]))
-      //{
-      //  throw new MyException("Error in memory sum bytes", -34);
-      //  return;
-      //}
-
-      var typeName = dMeta["type"];
-
-      string format = "HH:mm:ss.FFFFFFF"; // 7 заглавных 'F'
-
-      try
-      {
-        switch (typeName)
-        {
-          case not null when typeName == MemStatic.StCudaTemperature:  //_cudaTemperature:
-          {
-            var _temperature = MessagePackSerializer.Deserialize<CudaTemperature>(v.Bytes);
-            CudaDtTemperature _CudaDtTemp = new CudaDtTemperature(
-              DateTime.ParseExact(_temperature.Dt, format, CultureInfo.InvariantCulture), _temperature.Temp);
-            break;
-          }
-          case not null when typeName == MemStatic.StArrCudaTemperature:  //_arrCudaTemperature:
-          {
-            var temperatureArr = MessagePackSerializer.Deserialize<CudaTemperature[]>(v.Bytes);
-            var lsCudaDtTemp = temperatureArr.Select(x =>
-                new CudaDtTemperature(DateTime.ParseExact(x.Dt, format, CultureInfo.InvariantCulture), x.Temp)).ToList();
-             CudaTest01.PrintCudaTemperatures(temperatureArr);
-             Trace.WriteLine(" ---  Server ==> SEND  ---  ");
-              TestReturnData(temperatureArr);
-            break;
-          }
-        }
-      }
-      catch (Exception e)
-      {
-        Console.WriteLine(e);
-        throw new MyException($"Error convert {typeName}  byte from memory. ", -35);
-
-      }
-    });
-
-  }
-*/
   /// <summary>
   /// Отправляет клиенту подтверждение о получении данных.
   /// Передаются только метаданные, без основного блока данных.

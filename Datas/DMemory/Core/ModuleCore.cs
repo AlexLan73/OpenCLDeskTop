@@ -1,10 +1,11 @@
 ﻿
+using DMemory.Core.Copy;
 using DMemory.Core.Test;
 using System.Collections.Generic;
 
 namespace DMemory.Core;
 
-public class ModuleCore(string nameModule, ServerClient serverClient) : MemoryNomeNew(nameModule, serverClient)
+public class ModuleCore( ServerClient serverClient) : MemoryNomeNew("Cuda", serverClient)
 {
 
   public override void CallbackCommandDatAction(RecDataMetaData dMetaData)

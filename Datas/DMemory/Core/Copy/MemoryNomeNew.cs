@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Globalization;
 
-namespace DMemory.Core;
+namespace DMemory.Core.Copy;
 using MapCommands = Dictionary<string, string>;
 
 /// <summary>
@@ -27,7 +27,7 @@ public class MemoryNomeNew:IDisposable
   private readonly Func<int, byte[]> _funcReadByteData;
   private readonly MemoryBaseNew _memoryRead;
   private readonly MemoryBaseNew _memoryWrite;
-  private Dictionary<string, string> _dMD = new();
+  private MapCommands _dMD = new();
 
   //  public MemoryNome(string nameMemory, ServerClient serverClient, Action<RecDataMetaData> callBackCommandControl)
   public MemoryNomeNew(string nameMemory, ServerClient serverClient)
