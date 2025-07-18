@@ -63,6 +63,7 @@ public class ServerHandshake
       Console.ReadLine();
 
       var read1 = _memoryNome.ReadCommandControlWrite();
+      Console.WriteLine("Прочитано из MD: " + string.Join(";", read1.Select(kv => $"{kv.Key}={kv.Value}")));
 
       int kk11 = 1;
       Console.ReadLine();

@@ -7,9 +7,5 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\Core\Common\Common.csproj" />
-    <ProjectReference Include="..\..\Core\Modules\Modules.csproj" />
-  </ItemGroup>
 
 </Project>

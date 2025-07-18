@@ -29,7 +29,7 @@ public class MemoryNomeNew:IDisposable
   private readonly MemoryBaseNew _memoryWrite;
   private MapCommands _dMD = new();
 
-  //  public MemoryNome(string nameMemory, ServerClient serverClient, Action<RecDataMetaData> callBackCommandControl)
+  //  public MemoryNome(string nameMemory, ServerClient serverClient, Action<MapControl> callBackCommandControl)
   public MemoryNomeNew(string nameMemory, ServerClient serverClient)
   {
     NameModule = nameMemory;

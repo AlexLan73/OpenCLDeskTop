@@ -71,7 +71,7 @@ void TestTaskDataControl()
     Console.WriteLine("Нажмите Enter для выхода...");
     Console.ReadLine();
 
-    void ReceiveCallback(RecDataMetaData? message)
+    void ReceiveCallback(MapControl? message)
     {
       if(message == null || message.MetaData == null || !message.MetaData.Any()) 
         return;
@@ -106,7 +106,7 @@ void TestTaskDataControl()
 
 
 
-    void ProcessMessage(RecDataMetaData dMetaData)
+    void ProcessMessage(MapControl dMetaData)
     {
       if (dMetaData==null || dMetaData.MetaData == null || dMetaData.MetaData.Count()<0) 
         return;
