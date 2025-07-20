@@ -45,13 +45,13 @@ class TestServer
     if (map.TryGetValue("id", out string id_value))
     {
       var id = int.Parse(id_value);
-      if (id % 3 != 0) return;
-      map = new MapCommands
-      {
-        [_mem.State] = _mem.NameServer,
-        ["test"] = "test -> внешний server send  " + id_value
-      };
-      _mem.SendCommand(map);
+      //if (id % 3 != 0) return;
+      //map = new MapCommands
+      //{
+      //  [_mem.State] = _mem.NameServer,
+      //  ["test"] = "test -> внешний server send  " + id_value
+      //};
+      //_mem.WriteInMemoryMd(map);
     }
 
   }
@@ -103,7 +103,7 @@ var dict = new Dictionary<string, string>
 
 //while (true)
 //{
-// var _mmd = _mem.GetCommand();
+// var _mmd = _mem.ReadMemoryMd();
 // foreach (var kv in _mmd)
 //   Console.WriteLine($" -->  {kv.Key} = {kv.Value}");
 //  System.Threading.Thread.Sleep(500);

@@ -1,7 +1,5 @@
 ﻿
 using DMemory.Core.Copy;
-using DMemory.Core.Test;
-using System.Collections.Generic;
 
 namespace DMemory.Core;
 

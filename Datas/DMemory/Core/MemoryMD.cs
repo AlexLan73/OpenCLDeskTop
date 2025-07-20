@@ -1,16 +1,5 @@
-﻿using Common.Enum;
-using Common.Event;
-using DMemory.Constants;
-using DMemory.Core;
-using DMemory.Core.Server;
+﻿using Common.Event;
 using DMemory.Enum;
-using System.Collections.Generic;
-using System.Data;
-using System.Diagnostics;
-using System.IO.MemoryMappedFiles;
-using System.Text;
-using System.Windows.Forms;
-using System.Xml.Linq;
 
 
 namespace DMemory.Core;
@@ -35,9 +24,12 @@ public class MemoryMd : IDisposable
   #region ===_ Memory _===
   private string NameMemory { get; }          //  ключевое название CUDA, clFFT
   private string NameMdControl { get; }       //  полное название
-  private string EventNameMdControl { get; }  //  название для события
-  private EventWaitHandle EventMdControl { get; }       // событие
-  private readonly Task _waiteEventRead;                         // ожидание завершения потока
+  private string EventNameMdRead { get; }  //  название для события для сервера 
+  private EventWaitHandle EventMdRead { get; }       // событие
+  private string EventNameMdWrite { get; }  //  название для события для client 
+  private EventWaitHandle EventMdWrite { get; }       // событие  client
+  private readonly Task _waiteEventReadServer;                         // ожидание завершения потока
+
   private readonly MemoryMappedFile _memoryMappedFile;  // handler файла 
   private Action<MapCommands> _callBack;            // Инициализация пустым делегатом передать данные на верх
   private readonly CancellationTokenSource _cts;                 // завершение потока
@@ -71,25 +63,37 @@ public class MemoryMd : IDisposable
     _role = role;
     _nameRole = _role.ToString().ToLower();
     _controlMap.Add(State, _nameRole);
-    NameMdControl = $"{NameMemory}Control";               // имя metadata контроль
-    EventNameMdControl = @$"Global\Event{NameMdControl}"; // событие
-
+    NameMdControl = $"{NameMemory}Control";                     // имя metadata контроль
+    EventNameMdRead = @$"Global\Event{NameMemory}Read";     // событие сервер
+    EventNameMdWrite = @$"Global\Event{NameMemory}Write";     // событие сервер
+                                                                //    EventMdRead = @$"Global\Event{NameMdControl}"; // событие
+    string xxx = "";
     _memoryMappedFile = MemoryMappedFile.CreateOrOpen(NameMdControl, MemStatic.SizeDataControl);
 
-    EventMdControl = new EventWaitHandle(
+    EventMdRead = new EventWaitHandle(
       false,
       EventResetMode.AutoReset,
-      EventNameMdControl,
-      out var createdNew
+//      EventNameMdRead,
+      role == ClientServer.Server ? EventNameMdRead : EventNameMdWrite,
+      out var createdNewServer
     );
-    Trace.WriteLine(createdNew ? $"Создано новое событие {NameMemory}" : $"Подключено к существующему событию {NameMemory}");
+    Trace.WriteLine(createdNewServer ? $"Создано новое событие {NameMemory}Server" : $"Подключено к существующему событию {NameMemory}");
+
+
+    EventMdWrite = new EventWaitHandle(
+      false,
+      EventResetMode.AutoReset,
+      role != ClientServer.Server ? EventNameMdWrite:EventNameMdRead,
+      out var createdNewClient
+    );
+    Trace.WriteLine(createdNewClient ? $"Создано новое событие {NameMemory}Client" : $"Подключено к существующему событию {NameMemory}");
 
     //    
     _callBack = callBack;
     SateMode = SateMode.Initialization;
     _cts = new CancellationTokenSource();
     var token = _cts.Token;
-    _waiteEventRead = ReadDataCallBack(token);
+    _waiteEventReadServer = ReadDataCallBack(token);
     ResetAllTimer();
     SystemPulseTimer.OnHalfSecond += () =>
     { /* действия каждые 0.5 сек */
@@ -104,6 +108,16 @@ public class MemoryMd : IDisposable
     SystemPulseTimer.Start();
   }
 
+  public void InitializationCallBack(Action<MapCommands> callBack)
+  {
+    if (callBack == null)
+      return;
+
+    _callBack = callBack;
+  }
+  #endregion
+
+  #region ===-- ComparisonTimer ---
   private void ComparisonTimer()
   {
     if (SateMode.Work != SateMode)
@@ -116,38 +130,36 @@ public class MemoryMd : IDisposable
         // если счетчик не сбрасывается мы должны послать каждые примерено 1.5 сек
         _controlMap = new()
         {
-          [State]=NameServer,
+          [State] = _nameRole,
           [Work] = "",
-          ["--!!!-- Test "] ="!-!-!-!",
-      }
+          [$"-- просрочка по времени {_nameRole}   !!!-- Test "] = "!-!-!-!",
+        }
       ;
-        SendCommand(_controlMap);
+        WriteInMemoryMd(_controlMap);
         //    ResetInit();
       }
     }
 
     if (_initTimer < 20) return;
 
-    SateMode=SateMode.Initialization;
-    ResetInit();
-  }
+//    SateMode = SateMode.Initialization;
+//    ResetInit();
 
-  public void InitializationCallBack(Action<MapCommands> callBack)
-  {
-    if (callBack == null)
-      return;
-
-    _callBack = callBack;
   }
   #endregion
 
-  #region ===-- Set - Get - Clear --===
+  #region ===-- WriteInMemoryMd - Get - Clear --===
   /// <summary>
   /// Передаем командную строку для записи в раздел контроль и запускаем event
   /// </summary>
-  public void SendCommand(MapCommands dict)
+  public void WriteInMemoryMd(MapCommands dict)
   {
-    EventMdControl.Reset();
+//    EventMdRead.Reset();
+    if (_role == ClientServer.Server)
+      EventMdWrite.Reset();
+    else
+      EventMdRead.Reset();
+
     ClearMemoryMd();
     using (var accessor = _memoryMappedFile.CreateViewAccessor())
     {
@@ -155,9 +167,13 @@ public class MemoryMd : IDisposable
       accessor.WriteArray(0, data, 0, data.Length);
     }
 
-    EventMdControl.Set();
+    if (_role == ClientServer.Server)
+      EventMdWrite.Set();
+    else
+      EventMdRead.Set();
+
   }
-  public MapCommands GetCommand()
+  public MapCommands ReadMemoryMd()
   {
     using var accessor = _memoryMappedFile.CreateViewAccessor();
     // 2. Чтение данных
@@ -175,6 +191,35 @@ public class MemoryMd : IDisposable
     // 4. Десериализация строки обратно в словарь
     return ConvertStringToDict(sData);
   }
+  public (bool, MapCommands?) ReadMemoryMdAndClear()
+  {
+    using var accessor = _memoryMappedFile.CreateViewAccessor();
+    // 2. Чтение данных
+    var data = new byte[accessor.Capacity];
+    accessor.ReadArray(0, data, 0, data.Length);
+
+    // Убираем "пустые" байты в конце, если строка была короче буфера
+    var actualLength = Array.FindLastIndex(data, b => b != 0) + 1;
+    if (actualLength == 0 && data[0] != 0) actualLength = data.Length; // Если весь массив заполнен
+    if (actualLength == 0) return (false, null); // Память пуста
+
+    // 3. Декодирование из UTF8
+    var sData = Encoding.UTF8.GetString(data, 0, actualLength);
+    
+    // 4. Десериализация строки обратно в словарь
+    var _map = ConvertStringToDict(sData);
+
+    if (_map.ContainsKey(State) && _map[State] == _nameRole) 
+      return (false, _map);
+
+    using (var accessor1 = _memoryMappedFile.CreateViewAccessor())
+    {
+      // 2. Записываем пустой массив байтов по всему объему памяти
+      accessor1.WriteArray(0, MemStatic.EmptyBuffer, 0, MemStatic.SizeDataControl);
+    }
+
+    return (true, _map);
+  }
   public void ClearMemoryMd()
   {
     Trace.WriteLine("[Команда] Очистка разделяемой памяти...");
@@ -189,7 +234,6 @@ public class MemoryMd : IDisposable
     // 3. Подаем сигнал, чтобы "разбудить" всех ожидающих читателей
     // Они проснутся и прочитают пустые данные.
     Trace.WriteLine("[Команда] Память очищена. Подаю сигнал.");
-
   }
   #endregion
 
@@ -205,36 +249,42 @@ public class MemoryMd : IDisposable
     {
       try
       {
+        {
+          var (@is, map) = ReadMemoryMdAndClear();
+          if (!@is)
+          {
+            if(map==null)
+              ClearMemoryMd();
+
+            //if (_role == ClientServer.Server)
+            //  EventMdWrite.Reset();
+            //else
+            //  EventMdRead.Reset();
+          }
+          map = new()
+          {
+            [State] = _nameRole,
+//            [Command] = "",
+          };
+          SateMode = SateMode.Initialization;
+          ResetAllTimer();
+          WriteInMemoryMd(map);
+        }
+
         while (!cancellationToken.IsCancellationRequested)
         {
-          if (!EventMdControl.WaitOne(1000)) continue;
+          if (!EventMdRead.WaitOne(1000)) continue;
 
           // Блокируем доступ на время чтения
           lock (_syncLock) // Добавляем объект для синхронизации
           {
-            using var accessor = _memoryMappedFile.CreateViewAccessor();
-            var buffer = new byte[MemStatic.SizeDataControl];
-            accessor.ReadArray(0, buffer, 0, buffer.Length);
-            var received = Encoding.UTF8.GetString(buffer).TrimEnd('\0');
 
-            var map = ConvertStringToDict(received);
-            if (map == null)
+            var (@is, map) = ReadMemoryMdAndClear();
+            if(!@is)
             {
-              EventMdControl.Reset();
+              //EventMdRead.Reset();
               continue;
             }
-
-            if (map.ContainsKey(State) && map[State] == _nameRole)
-              continue;
-
-//            foreach (var kv in map)
-//              Console.WriteLine($" - mem MD -!>  {kv.Key} = {kv.Value}");
-
-            //
-            //  Здесь обработка данных на предмет подтвердить вызывающей стороне, что услышал
-            // [state]=client => [state]=server [commanda]=ok,  [state]=server => [state]=client [commanda]=ok,   <== инициализация 
-            // или [work]="" 
-            //
 
             if (map.TryAdd("satemode", SateMode.ToString()))
               map["satemode"] = SateMode.ToString();
@@ -245,19 +295,21 @@ public class MemoryMd : IDisposable
               {
                 // инициализация проходит [commanda]=ok переходим в SateMode.Work:
                 //SateMode= SateMode.Work;
-                if (map.TryGetValue(State, out string receivedState))
+                if (map.TryGetValue(State, out string receivedState) && receivedState!=null)
                 {
                   if (_role == ClientServer.Client)
                   {
                     if (receivedState == NameServer)
                     {
-                      if (map.TryGetValue(Command, out string receivedCommand))
+                      if (map.TryGetValue(Command, out var receivedCommand) && receivedCommand!=null)
                       {
                         if (receivedCommand == Ok)
                         {
                           SateMode = SateMode.Work;
-                          ClearMemoryMd();
-                          EventMdControl.Reset();
+                          if (_role == ClientServer.Server)
+                            EventMdWrite.Reset();
+                          else
+                            EventMdRead.Reset();
                         }
 
                       }
@@ -269,9 +321,8 @@ public class MemoryMd : IDisposable
                           [Command] = Ok,
                         };
                         SateMode = SateMode.Work;
-                        ClearMemoryMd();
                         ResetAllTimer();
-                        SendCommand(map);
+                        WriteInMemoryMd(map);
                       }
                     }
                   }
@@ -279,14 +330,17 @@ public class MemoryMd : IDisposable
                   {
                     if (receivedState == NameClient)
                     {
-                      if (map.TryGetValue(Command, out string receivedCommand))
+                      if (map.TryGetValue(Command, out string receivedCommand) && receivedCommand != null)
                       {
                         if (receivedCommand == Ok)
                         {
                           SateMode = SateMode.Work;
                           ClearMemoryMd();
                           ResetAllTimer();
-                          EventMdControl.Reset();
+                          if (_role == ClientServer.Server)
+                            EventMdWrite.Reset();
+                          else
+                            EventMdRead.Reset();
                         }
                       }
                       else
@@ -297,28 +351,31 @@ public class MemoryMd : IDisposable
                           [Command] = Ok
                         };
                         SateMode = SateMode.Work;
-                        ClearMemoryMd();
-                        SendCommand(map);
+//                        ClearMemoryMd();
+                        WriteInMemoryMd(map);
                         ResetAllTimer();
                       }
                     }
                   }
 
                 }
-//                _callBack?.Invoke(map);   EventMdControl.Reset();
+//                _callBack?.Invoke(map);   EventMdRead.Reset();
                 break;
               }
               case SateMode.Work:
               {
-                if (!map.TryGetValue(State, out string receivedState))
+                if (!map.TryGetValue(State, out var receivedState) && receivedState!=null)
                 { // сработало прерывание, но State нет, сбрасываем прерывание и выходим
-                  EventMdControl.Reset();
+                  if (_role == ClientServer.Server)
+                    EventMdWrite.Reset();
+                  else
+                    EventMdRead.Reset();
                   break;
                 }
 
                 if (receivedState == _nameRole)
                 {
-                  EventMdControl.Reset();
+                  EventMdRead.Reset();
                   break;
                 }
 
@@ -329,33 +386,42 @@ public class MemoryMd : IDisposable
                     [Work] = Ok,
                     [State] = _nameRole
                   };
-                  SendCommand(map);
+                  WriteInMemoryMd(map);
                   break;
                 }
 
                 ResetAllTimer();
                 _callBack?.Invoke(map);
-                EventMdControl.Reset();
+                if (_role == ClientServer.Server)
+                  EventMdWrite.Reset();
+                else
+                  EventMdRead.Reset();
                 break;
               }
               case SateMode.Dispose:
                 ResetAllTimer();
                 _callBack?.Invoke(map);
-                EventMdControl.Reset();
+                if (_role == ClientServer.Server)
+                  EventMdWrite.Reset();
+                else
+                  EventMdRead.Reset();
                 continue;
 
                 break;
 
               case SateMode.None:
               default:
-                EventMdControl.Reset();
+                if (_role == ClientServer.Server)
+                  EventMdWrite.Reset();
+                else
+                  EventMdRead.Reset();
                 continue;
             }
 //            _callBack?.Invoke(map);
           }
 
           // Для AutoReset режима это не обязательно, но для надежности:
-         // EventMdControl.Reset();
+         // EventMdRead.Reset();
         }
       }
       catch (Exception ex)
@@ -396,8 +462,8 @@ public class MemoryMd : IDisposable
     if (disposing)
     {
       _cts?.Cancel();
-      _waiteEventRead?.Wait(TimeSpan.FromSeconds(1)); // Ограниченное ожидание
-      EventMdControl?.Dispose();
+      _waiteEventReadServer?.Wait(TimeSpan.FromSeconds(1)); // Ограниченное ожидание
+      EventMdRead?.Dispose();
       _memoryMappedFile?.Dispose();
       _cts?.Dispose();
     }

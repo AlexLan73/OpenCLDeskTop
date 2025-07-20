@@ -1,7 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Globalization;
-
-namespace DMemory.Core;
+﻿namespace DMemory.Core;
 using MapCommands = Dictionary<string, string>;
 
 /// <summary>
@@ -22,15 +19,15 @@ public class MemoryNome : IDisposable
    
        /// Записать команду (словарь) в MD
        public void CommandControlWrite(Dictionary<string, string> command)
-           => _memoryWrite.SendCommand(command);
+           => _memoryWrite.WriteInMemoryMd(command);
    
        /// Прочитать текущую запись из MD (control)
        public Dictionary<string, string> ReadCommandControlWrite()
-           => _memoryWrite.GetCommand();
+           => _memoryWrite.ReadMemoryMd();
    
        /// Прочитать текущую запись из MD (read-канал)
        public Dictionary<string, string> ReadCommandControlRead()
-           => _memoryRead.GetCommand();
+           => _memoryRead.ReadMemoryMd();
    
        /// Очистить MD ("write"-канал)
        public void ClearCommandControlWrite()
@@ -176,7 +173,7 @@ public class MemoryNome:IDisposable
 //    _memoryRead = new MemoryBase(nameMemory + "Read", TypeBlockMemory.Read);
 //    _memoryRead.InitializationCallBack(CallbackCommandDatAction);
 //    _memoryWrite = new MemoryBase(nameMemory + "Write", TypeBlockMemory.Write);
-//    //_setCommandControl = _memoryWrite.SendCommand;
+//    //_setCommandControl = _memoryWrite.WriteInMemoryMd;
 //    //_actionWriteByteData = _memoryWrite.WriteByteData;
 //    //_actionWriteByteDataM = _memoryWrite.WriteByteData;
 //    //_funcReadByteData = _memoryRead.ReadMemoryData;
@@ -186,13 +183,13 @@ public class MemoryNome:IDisposable
 //    _memoryRead = new MemoryBase(nameMemory + "Write", TypeBlockMemory.Read);
 //    _memoryRead.InitializationCallBack(CallbackCommandDatAction);
 //    _memoryWrite = new MemoryBase(nameMemory + "Read", TypeBlockMemory.Write);
-//    //_setCommandControl = _memoryWrite.SendCommand;
+//    //_setCommandControl = _memoryWrite.WriteInMemoryMd;
 //    //_actionWriteByteData = _memoryWrite.WriteByteData;
 //    //_actionWriteByteDataM = _memoryWrite.WriteByteData;
 //    //_funcReadByteData = _memoryRead.ReadMemoryData;
 //  }
 
-//  _setCommandControl = _memoryWrite.SendCommand;
+//  _setCommandControl = _memoryWrite.WriteInMemoryMd;
 //  _actionWriteByteData = _memoryWrite.WriteByteData;
 //  _actionWriteByteDataM = _memoryWrite.WriteByteData;
 //  _funcReadByteData = _memoryRead.ReadMemoryData;

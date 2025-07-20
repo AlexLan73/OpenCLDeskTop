@@ -1,7 +1,4 @@
-﻿using System.Diagnostics;
-
-
-namespace DMemory.Core.Copy;
+﻿namespace DMemory.Core.Copy;
 
 using System.Threading;
 using MapCommands = Dictionary<string, string>;

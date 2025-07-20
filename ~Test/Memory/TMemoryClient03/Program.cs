@@ -33,6 +33,8 @@ class TestClient
   }
   public void Run()
   {
+    Console.WriteLine("Нажмите Enter для завершения работы сервера.");
+    Console.ReadLine();
     // Имитация записи тестовых метаданных
     var dict = new Dictionary<string, string>
     {
@@ -51,10 +53,15 @@ class TestClient
         [_mem.State] = _mem.NameClient,
         ["id"] = ii.ToString(),
       };
-      _mem.SendCommand(dict);
+
+      var _mapTest = _mem.ReadMemoryMd();
+      if (_mapTest != null && _mapTest.Count() == 0)
+      {
+        _mem.WriteInMemoryMd(dict);
+        Console.WriteLine($" i = {ii} ");
+        ii++;
+      }
       System.Threading.Thread.Sleep(800);
-      Console.WriteLine($" i = {ii} ");
-      ii++;
     }
 
 
@@ -74,7 +81,7 @@ class TestClient
         [_mem.State] = _mem.NameServer,
         ["test"] = "test" + id_value
       };
-      _mem.SendCommand(map);
+      _mem.WriteInMemoryMd(map);
     }
 */
   }

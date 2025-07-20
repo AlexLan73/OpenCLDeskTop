@@ -1,7 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Globalization;
-
-namespace DMemory.Core.Copy;
+﻿namespace DMemory.Core.Copy;
 using MapCommands = Dictionary<string, string>;
 
 /// <summary>

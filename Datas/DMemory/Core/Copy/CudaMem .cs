@@ -1,7 +1,4 @@
-﻿using DMemory.Core.Test;
-using System.Collections.Generic;
-
-namespace DMemory.Core.Copy;
+﻿namespace DMemory.Core.Copy;
 
 public class CudaMem(ServerClient serverClient) : MemoryNome("Cuda", serverClient)
 {

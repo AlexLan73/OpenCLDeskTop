@@ -19,3 +19,20 @@ public enum ClientServer
   Client,
   Server
 }
+
+public static class ClientServerExtensions
+{
+  public static string AsKey(this ClientServer cmd) => cmd switch
+  {
+    ClientServer.Client => "client",
+    ClientServer.Server => "server",
+    _ => ""
+  };
+}
+                                                                
+//// Пример использования:
+//var reserved = new Dictionary<string, string>
+//{
+//  [ ClientServer.Client.AsKey()] = "serverCUDA",
+//  [ ClientServer.Server.AsKey()] = "ok"
+//};
