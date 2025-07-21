@@ -13,6 +13,7 @@ MetaSettings _mata = new("CUDA");
 int _count = 0;
 
 var server = new ServerPong(_mata);
+
 var client = new ClientPing(_mata);
 
 while (true)
@@ -34,9 +35,10 @@ while (true)
 }
 
 server.Dispose();
-client.Dispose();
+//client.Dispose();
 
-await Task.WhenAll(server._waiteEvent, client._waiteEvent);
+//await Task.WhenAll(server._waiteEvent, client._waiteEvent);
+await Task.WhenAll(server._waiteEvent);
 
 
 public class ServerPong : IDisposable
