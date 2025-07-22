@@ -95,15 +95,15 @@ public class MemoryMd : IDisposable
     var token = _cts.Token;
     _waiteEventReadServer = ReadDataCallBack(token);
     ResetAllTimer();
-    SystemPulseTimer.OnHalfSecond += () =>
+    SystemPulseTimer.On250MilSec += () =>
     { /* действия каждые 0.5 сек */
       if(SateMode.Work == SateMode)
         _initTimer = IncInit();
     };
-    SystemPulseTimer.OnOneSecond += ComparisonTimer; 
+    SystemPulseTimer.On1Second += ComparisonTimer; 
 
-//    SystemPulseTimer.OnOneSecond += () => { /* проверки или запрос [work]="" */ };
-//    SystemPulseTimer.OnFiveSeconds += () => { /* переход в init или reset таймеров */ };
+//    SystemPulseTimer.On1Second += () => { /* проверки или запрос [work]="" */ };
+//    SystemPulseTimer.On5Seconds += () => { /* переход в init или reset таймеров */ };
 
     SystemPulseTimer.Start();
   }

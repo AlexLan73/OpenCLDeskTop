@@ -13,6 +13,7 @@ MetaSettings mata = new("CUDA");
 int count = 0;
 
 var server = new ServerMetaData(mata);
+//var client = new ClientMetaData(mata);
 
 while (true)
 {
@@ -28,6 +29,10 @@ while (true)
   }
 
   Console.WriteLine($"Tick: {DateTime.Now:HH:mm:ss}  &  count {count}");
+  Console.WriteLine($"STATE MODE");
+  Console.WriteLine($"[Server] -> {server._mode}");
+//  Console.WriteLine($"[Client] -> {client._mode}");
+
   Thread.Sleep(1000);
   count++;
 }

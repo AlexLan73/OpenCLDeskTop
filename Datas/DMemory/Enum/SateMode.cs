@@ -29,7 +29,14 @@ public static class ClientServerExtensions
     _ => ""
   };
 }
-                                                                
+
+public enum TransferWaiting
+{
+  Transfer,
+  Waiting
+}
+
+
 //// Пример использования:
 //var reserved = new Dictionary<string, string>
 //{

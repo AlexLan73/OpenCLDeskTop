@@ -1,4 +1,5 @@
-﻿using DMemory.Enum;
+﻿using Common.Event;
+using DMemory.Enum;
 
 namespace DMemory.Core;
 using MapCommands = Dictionary<string, string>;
@@ -15,7 +16,26 @@ public class ServerMetaData : IDisposable
   private readonly string _nameModule;
   private readonly string _clientName;
 
-  private SateMode _mode;
+  public SateMode _mode;
+  public TransferWaiting _transferWaiting;// Используется только для подтверждения ответа в режиме Work
+
+  #region ===_ Time _===
+  private int _oneSecCounter = 0;
+  private int _fiveSecCounter = 0;
+  private int _missedWorkAcks = 0; // сколько раз не получили ack
+  private int _workOkExpecting = 0;
+  private int _initTimer = 0;
+  private int _timeGeneralWork = 0;
+  private int _timeWork = 0;
+  private int _timeInitialization = 0;
+
+  private const int _CompeGeneralWork = 1*12*5; // раз в 5 сек *12 минута * 5=> 5мин
+  private const int _CompelWork = (int) 6;      // 6 раза с интервалом 0.25
+  private const int _CompeInitialization = 6;   //  каждые 5 сек запрос на контроль.
+
+  #endregion
+
+
 
   public ServerMetaData(MetaSettings meta)
   {
@@ -33,12 +53,44 @@ public class ServerMetaData : IDisposable
         CallBackMetaData,
         SendToClient
     );
-
+    
     _mode = SateMode.Initialization;
+    var initAck = new MapCommands
+    {
+      [MdCommand.State.AsKey()] = _nameModule,
+    };
+    Md.WriteMetaMap(initAck);
 
+    _transferWaiting = TransferWaiting.Transfer;
+    
+    ResetAllTimer();
+    SystemPulseTimer.On250MilSec += () =>
+    { /* действия каждые 0.25 сек */
+      _timeWork = IncWork();
+    };
+
+    SystemPulseTimer.On250MilSec += () =>
+    { /* действия каждые 0.25 сек */
+      _timeWork = IncWork();
+    };
+    SystemPulseTimer.On250MilSec += Comparison250MilSec; 
+
+    SystemPulseTimer.On1Second += () =>
+    {
+      _timeInitialization = IncInitialization();
+    };
+    SystemPulseTimer.On1Second += Comparison1SecTimer;
+
+    SystemPulseTimer.On5Seconds += () =>
+    {
+      _timeGeneralWork = IncGeneralWork();
+    };
+
+    SystemPulseTimer.Start();
     // Старт фона (будет использоваться при добавлении таймов)
     WaiteEvent = Task.CompletedTask;
   }
+
 
   private void CallBackMetaData(MapCommands map)
   {
@@ -48,7 +100,7 @@ public class ServerMetaData : IDisposable
     if (!map.TryGetValue(MdCommand.State.AsKey(), out var stateValue))
       return;
 
-    if (stateValue != _clientName)
+    if (stateValue == _nameModule)
       return;
 
     Console.WriteLine($"[Server] Получено от {stateValue}:");
@@ -59,15 +111,17 @@ public class ServerMetaData : IDisposable
     switch (_mode)
     {
       case SateMode.Initialization:
+      {
         if (map.TryGetValue(MdCommand.Command.AsKey(), out var cmdVal))
         {
+          ResetWorkProtocol();
           if (cmdVal == MdCommand.Ok.AsKey())
           {
             _mode = SateMode.Work;
             Console.WriteLine(">>> Handshake подтверждён, переход в Work");
             return;
           }
-          else if (cmdVal == "")
+          else if (cmdVal == "_")
           {
             // Отвечаем ok
             var reply = new MapCommands
@@ -76,7 +130,8 @@ public class ServerMetaData : IDisposable
               [MdCommand.Command.AsKey()] = MdCommand.Ok.AsKey()
             };
             Md.WriteMetaMap(reply);
-            Console.WriteLine(">>> Отправили ok для завершения handhsake");
+            Console.WriteLine(">>> Server Отправили ok для завершения handhsake");
+            _mode = SateMode.Work;
             return;
           }
         }
@@ -90,12 +145,28 @@ public class ServerMetaData : IDisposable
         Md.WriteMetaMap(initAck);
         Console.WriteLine(">>> Отправили пустой command server → client");
         break;
+    }
 
-      case SateMode.Work:
-        // Здесь будет основная логика работы: приём данных, реакции, управление
-        Console.WriteLine(">>> Работаем: получили данные в режиме Work");
-        // 👇 Пока ничего не шлём, ждём команды подтверждения
-        break;
+    case SateMode.Work:
+      {
+          //  Когда будут посылаться данные ставится TransferWaiting.Waiting !!
+          // Здесь будет основная логика работы: приём данных, реакции, управление
+          Console.WriteLine(">>> Работаем: получили данные в режиме Work");
+          // 👇 Пока ничего не шлём, ждём команды подтверждения
+
+          if (map.TryGetValue(MdCommand.Command.AsKey(), out var cmdVal))
+            if (cmdVal == MdCommand.Ok.AsKey())
+            {
+//              _mode = SateMode.Work;
+              _transferWaiting = TransferWaiting.Transfer;   // подтверждение, что данные были приняты
+              Console.WriteLine(">>> Handshake подтверждён, переход в Work");
+              return;
+            }
+
+      }
+
+
+    break;
 
       case SateMode.Dispose:
         Console.WriteLine(">>> Завершаем работу");
@@ -114,6 +185,103 @@ public class ServerMetaData : IDisposable
     Md?.Dispose();
     SendToClient?.Dispose();
   }
+
+  #region ===-- Comparison1SecTimer ---
+  private void Comparison250MilSec()
+  {
+    //private const int _CompeGeneralWork = 1 * 12 * 5; // раз в 5 сек *12 минута * 5=> 5мин
+    //private const int _CompelWork = (int)6;      // 6 раза с интервалом 0.25
+    //private const int _CompeInitialization = 6; 
+
+  }
+  private void Comparison1SecTimer()
+  {
+/*
+    if (SateMode.Work != _mode)
+      return;
+
+    if (_initTimer % 3 == 0)
+    {
+      if (!_controlMap.TryAdd(Work, ""))
+      {
+        // если счетчик не сбрасывается мы должны послать каждые примерено 1.5 сек
+        _controlMap = new()
+          {
+            [State] = _nameRole,
+            [Work] = "",
+            [$"-- просрочка по времени {_nameRole}   !!!-- Test "] = "!-!-!-!",
+          }
+          ;
+        WriteInMemoryMd(_controlMap);
+        //    ResetInit();
+      }
+    }
+
+    if (_initTimer < 20) return;
+
+    //    SateMode = SateMode.Initialization;
+    //    ResetInit();
+*/
+  }
+  #endregion
+
+  #region ===-- Work Timer --===
+  // Общий сброс всех таймеров и счётчиков
+  public void ResetAllTimer()
+  {
+    Interlocked.Exchange(ref _oneSecCounter, 0);
+    Interlocked.Exchange(ref _fiveSecCounter, 0);
+    Interlocked.Exchange(ref _missedWorkAcks, 0);
+    Interlocked.Exchange(ref _workOkExpecting, 0);
+    Interlocked.Exchange(ref _initTimer, 0);
+
+    Interlocked.Exchange(ref _timeGeneralWork, 0);
+    Interlocked.Exchange(ref _timeWork, 0);
+    Interlocked.Exchange(ref _timeInitialization, 0);
+  }
+
+  void ResetWorkProtocol()
+  {
+    ResetGeneralWork();
+    ResetWork();
+    ResetInitialization();
+
+  }
+
+  // Все методы увеличения/сброса - так же через Interlocked
+  public int IncOneSec() => Interlocked.Increment(ref _oneSecCounter);
+  public int IncFiveSec() => Interlocked.Increment(ref _fiveSecCounter);
+
+  public int IncGeneralWork() => Interlocked.Increment(ref _timeGeneralWork);
+  public void ResetGeneralWork() => Interlocked.Exchange(ref _timeGeneralWork, 0);
+  public int GetGeneralWork() => Interlocked.CompareExchange(ref _timeGeneralWork, 0, 0);
+
+  public int IncWork() => Interlocked.Increment(ref _timeWork);
+  public void ResetWork() => Interlocked.Exchange(ref _timeWork, 0);
+  public int GetWork() => Interlocked.CompareExchange(ref _timeWork, 0, 0);
+  
+  public int IncInitialization() => Interlocked.Increment(ref _timeInitialization);
+  public void ResetInitialization() => Interlocked.Exchange(ref _timeInitialization, 0);
+  public int GetInitialization() => Interlocked.CompareExchange(ref _timeInitialization, 0, 0);
+
+
+  public void ResetOneSec() => Interlocked.Exchange(ref _oneSecCounter, 0);
+  public void ResetTenSec() => Interlocked.Exchange(ref _fiveSecCounter, 0);
+  public int GetOneSec() => Interlocked.CompareExchange(ref _oneSecCounter, 0, 0);
+  public int GetTenSec() => Interlocked.CompareExchange(ref _fiveSecCounter, 0, 0);
+  // Счетчик "work-ответов"
+  public int IncWorkAckMissed() => Interlocked.Increment(ref _missedWorkAcks);
+  public void ResetWorkAckMissed() => Interlocked.Exchange(ref _missedWorkAcks, 0);
+  public int GetWorkAckMissed() => Interlocked.CompareExchange(ref _missedWorkAcks, 0, 0);
+  // Для перехода в Initialization если таймаут
+  public int IncInit() => Interlocked.Increment(ref _initTimer);
+  public void ResetInit() => Interlocked.Exchange(ref _initTimer, 0);
+  public int GetInit() => Interlocked.CompareExchange(ref _initTimer, 0, 0);
+
+  public SateMode GetSateMode() => _mode;
+  public void SetSateMode(SateMode sm) => _mode = sm;
+  #endregion
+
 }
 
 

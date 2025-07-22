@@ -13,6 +13,8 @@ public class BasicMemoryMd : IDisposable
   private readonly object _syncLock = new();
   private readonly EventWaitHandle _sendTo;
 
+
+
   public BasicMemoryMd(string eventName, int size, string controlName, Action<MapCommands> callBack, EventWaitHandle sendTo)
   {
     _size = size;
@@ -22,6 +24,8 @@ public class BasicMemoryMd : IDisposable
     _callBack = callBack ?? (_ => { });
     _cts = new CancellationTokenSource();
     _waiteEvent = Task.Run(() => WaitEventLoop(_cts.Token), _cts.Token);
+
+
   }
 
   private void WaitEventLoop(CancellationToken token)
