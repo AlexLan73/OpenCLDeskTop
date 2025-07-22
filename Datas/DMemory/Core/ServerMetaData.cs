@@ -20,22 +20,8 @@ public class ServerMetaData : IDisposable
   public TransferWaiting _transferWaiting;// Используется только для подтверждения ответа в режиме Work
 
   #region ===_ Time _===
-  private int _oneSecCounter = 0;
-  private int _fiveSecCounter = 0;
-  private int _missedWorkAcks = 0; // сколько раз не получили ack
-  private int _workOkExpecting = 0;
-  private int _initTimer = 0;
-  private int _timeGeneralWork = 0;
-  private int _timeWork = 0;
-  private int _timeInitialization = 0;
-
-  private const int _CompeGeneralWork = 1*12*5; // раз в 5 сек *12 минута * 5=> 5мин
-  private const int _CompelWork = (int) 6;      // 6 раза с интервалом 0.25
-  private const int _CompeInitialization = 6;   //  каждые 5 сек запрос на контроль.
-
+  private readonly ServerMetaDataTimer _timer = new ServerMetaDataTimer();
   #endregion
-
-
 
   public ServerMetaData(MetaSettings meta)
   {
@@ -64,34 +50,37 @@ public class ServerMetaData : IDisposable
 
     _transferWaiting = TransferWaiting.None;
 
-    ResetAllTimer();
+    _timer.ResetAll();
     SystemPulseTimer.On250MilSec += () =>
     { /* действия каждые 0.25 сек */
-      _timeWork = IncWork();
+      if (_mode == SateMode.Work)
+      {
+        _timer._timeWork = _timer.IncWork();
+      }
+      else
+        _timer.ResetWork();
     };
 
-    SystemPulseTimer.On250MilSec += () =>
-    { /* действия каждые 0.25 сек */
-      _timeWork = IncWork();
-    };
     SystemPulseTimer.On250MilSec += Comparison250MilSec; 
 
     SystemPulseTimer.On1Second += () =>
     {
-      _timeInitialization = IncInitialization();
+      if(_mode == SateMode.Initialization)
+        _timer._timeInitialization = _timer.IncInitialization();
+      else
+        _timer.ResetInitialization();
     };
     SystemPulseTimer.On1Second += Comparison1SecTimer;
 
     SystemPulseTimer.On5Seconds += () =>
     {
-      _timeGeneralWork = IncGeneralWork();
+      _timer._timeGeneralWork = _timer.IncGeneralWork();
     };
 
     SystemPulseTimer.Start();
     // Старт фона (будет использоваться при добавлении таймов)
     WaiteEvent = Task.CompletedTask;
   }
-
 
   private void CallBackMetaData(MapCommands map)
   {
@@ -103,6 +92,7 @@ public class ServerMetaData : IDisposable
 
     if (stateValue == _nameModule)
       return;
+    _timer.ResetGeneralWork();
 
     Console.WriteLine($"[Server] Получено от {stateValue}:");
 
@@ -115,11 +105,12 @@ public class ServerMetaData : IDisposable
       {
         if (map.TryGetValue(MdCommand.Command.AsKey(), out var cmdVal))
         {
-          ResetWorkProtocol();
+          _timer.ResetWorkProtocol();
           if (cmdVal == MdCommand.Ok.AsKey())
           {
             _mode = SateMode.Work;
             _transferWaiting = TransferWaiting.Transfer;
+            _timer.ResetInitialization();
             Console.WriteLine(">>> Handshake подтверждён, переход в [SERVER] Work");
             return;
           }
@@ -134,6 +125,7 @@ public class ServerMetaData : IDisposable
             Md.WriteMetaMap(reply);
             Console.WriteLine(">>> Server Отправили ok для завершения [SERVER]  handhsake");
             _mode = SateMode.Work;
+            _timer.ResetInitialization();
             _transferWaiting = TransferWaiting.Transfer;
             return;
           }
@@ -158,12 +150,12 @@ public class ServerMetaData : IDisposable
         // 👇 Пока ничего не шлём, ждём команды подтверждения
 
         if (map.Count == 1) return;
-
+        _timer.ResetWork();
+        _timer.ResetWorkSendCount();
         if (map.TryGetValue(MdCommand.Command.AsKey(), out var cmdVal))
         {
           if (cmdVal == MdCommand.Ok.AsKey())
           {
-//              _mode = SateMode.Work;
             _transferWaiting = TransferWaiting.Transfer; // подтверждение, что данные были приняты
             Console.WriteLine(">>> Handshake подтверждён, переход в SERVER Work");
             return;
@@ -171,9 +163,7 @@ public class ServerMetaData : IDisposable
         }
         else
         {
-
           var searchTerms = new List<string> { MdCommand.State.AsKey(), "id" };
-//          var lsKey = ;
           var matchedKeys = map.Keys.ToList()
             .Where(key => searchTerms.Any(term => key.Contains(term, StringComparison.OrdinalIgnoreCase)))
             .ToList();
@@ -213,251 +203,74 @@ public class ServerMetaData : IDisposable
   #region ===-- Comparison1SecTimer ---
   private void Comparison250MilSec()
   {
-    //private const int _CompeGeneralWork = 1 * 12 * 5; // раз в 5 сек *12 минута * 5=> 5мин
-    //private const int _CompelWork = (int)6;      // 6 раза с интервалом 0.25
-    //private const int _CompeInitialization = 6; 
-
+    if (_mode == SateMode.Work && _timer.GetWork()> _timer._CompelWork)
+    {
+      _timer.ResetWork();
+      var initAck = new MapCommands
+      {
+        [MdCommand.State.AsKey()] = _nameModule,
+        [MdCommand.Command.AsKey()] = "_"
+      };
+      Md.WriteMetaMap(initAck);
+      _timer._workSendCount = _timer.IncWorkSendCount();
+    }
   }
   private void Comparison1SecTimer()
   {
-/*
-    if (SateMode.Work != _mode)
-      return;
 
-    if (_initTimer % 3 == 0)
-    {
-      if (!_controlMap.TryAdd(Work, ""))
+    if (_mode == SateMode.Work && _timer.GetInitialization() > _timer._CompeGeneralWork)
+    { // время вышло связи нет переходим на начальный уровень
+      _mode = SateMode.Initialization;
+      _timer.ResetWork();
+      _timer.ResetInitialization();
+      _transferWaiting = TransferWaiting.None;
+
+      var initAck = new MapCommands
       {
-        // если счетчик не сбрасывается мы должны послать каждые примерено 1.5 сек
-        _controlMap = new()
-          {
-            [State] = _nameRole,
-            [Work] = "",
-            [$"-- просрочка по времени {_nameRole}   !!!-- Test "] = "!-!-!-!",
-          }
-          ;
-        WriteInMemoryMd(_controlMap);
-        //    ResetInit();
-      }
+        [MdCommand.State.AsKey()] = _nameModule,
+        [MdCommand.Command.AsKey()] = "_"
+      };
+      Md.WriteMetaMap(initAck);
+      return;
     }
 
-    if (_initTimer < 20) return;
+    if (_mode == SateMode.Initialization && (_timer.GetInitialization()% 5  == 1))
+    { // время вышло связи нет переходим на начальный уровень
+      _mode = SateMode.Initialization;
+      _transferWaiting = TransferWaiting.None;
 
-    //    SateMode = SateMode.Initialization;
-    //    ResetInit();
-*/
+      _timer.ResetWork();
+//      ResetInitialization();
+      var initAck = new MapCommands
+      {
+        [MdCommand.State.AsKey()] = _nameModule,
+        [MdCommand.Command.AsKey()] = "_"
+      };
+      Md.WriteMetaMap(initAck);
+      return;
+    }
+
+    if (_mode == SateMode.Work && _timer.GetWorkSendCount() > _timer._CompelWorkSendCount)
+    {
+      _mode = SateMode.Initialization;
+      _timer.ResetWork();
+      _timer.ResetInitialization();
+      _timer.ResetWorkSendCount();
+      var initAck = new MapCommands
+      {
+        [MdCommand.State.AsKey()] = _nameModule,
+        [MdCommand.Command.AsKey()] = "_"
+      };
+      Md.WriteMetaMap(initAck);
+      _timer._workSendCount = _timer.IncWorkSendCount();
+    }
   }
   #endregion
 
-  #region ===-- Work Timer --===
-  // Общий сброс всех таймеров и счётчиков
-  public void ResetAllTimer()
-  {
-    Interlocked.Exchange(ref _oneSecCounter, 0);
-    Interlocked.Exchange(ref _fiveSecCounter, 0);
-    Interlocked.Exchange(ref _missedWorkAcks, 0);
-    Interlocked.Exchange(ref _workOkExpecting, 0);
-    Interlocked.Exchange(ref _initTimer, 0);
-
-    Interlocked.Exchange(ref _timeGeneralWork, 0);
-    Interlocked.Exchange(ref _timeWork, 0);
-    Interlocked.Exchange(ref _timeInitialization, 0);
-  }
-
-  void ResetWorkProtocol()
-  {
-    ResetGeneralWork();
-    ResetWork();
-    ResetInitialization();
-
-  }
-
-  // Все методы увеличения/сброса - так же через Interlocked
-  public int IncOneSec() => Interlocked.Increment(ref _oneSecCounter);
-  public int IncFiveSec() => Interlocked.Increment(ref _fiveSecCounter);
-
-  public int IncGeneralWork() => Interlocked.Increment(ref _timeGeneralWork);
-  public void ResetGeneralWork() => Interlocked.Exchange(ref _timeGeneralWork, 0);
-  public int GetGeneralWork() => Interlocked.CompareExchange(ref _timeGeneralWork, 0, 0);
-
-  public int IncWork() => Interlocked.Increment(ref _timeWork);
-  public void ResetWork() => Interlocked.Exchange(ref _timeWork, 0);
-  public int GetWork() => Interlocked.CompareExchange(ref _timeWork, 0, 0);
-  
-  public int IncInitialization() => Interlocked.Increment(ref _timeInitialization);
-  public void ResetInitialization() => Interlocked.Exchange(ref _timeInitialization, 0);
-  public int GetInitialization() => Interlocked.CompareExchange(ref _timeInitialization, 0, 0);
-
-
-  public void ResetOneSec() => Interlocked.Exchange(ref _oneSecCounter, 0);
-  public void ResetTenSec() => Interlocked.Exchange(ref _fiveSecCounter, 0);
-  public int GetOneSec() => Interlocked.CompareExchange(ref _oneSecCounter, 0, 0);
-  public int GetTenSec() => Interlocked.CompareExchange(ref _fiveSecCounter, 0, 0);
-  // Счетчик "work-ответов"
-  public int IncWorkAckMissed() => Interlocked.Increment(ref _missedWorkAcks);
-  public void ResetWorkAckMissed() => Interlocked.Exchange(ref _missedWorkAcks, 0);
-  public int GetWorkAckMissed() => Interlocked.CompareExchange(ref _missedWorkAcks, 0, 0);
-  // Для перехода в Initialization если таймаут
-  public int IncInit() => Interlocked.Increment(ref _initTimer);
-  public void ResetInit() => Interlocked.Exchange(ref _initTimer, 0);
-  public int GetInit() => Interlocked.CompareExchange(ref _initTimer, 0, 0);
-
-  public SateMode GetSateMode() => _mode;
-  public void SetSateMode(SateMode sm) => _mode = sm;
-  #endregion
 
   public void WriteMetaMap(MapCommands map)
   {
     Md.WriteMetaMap(map);
   }
 }
-
-
-
-
-//public class ServerMetaData
-//{
-//  private readonly MetaSettings _meta;
-//  public BasicMemoryMd Md;
-//  public EventWaitHandle SendToClient;
-//  private readonly CancellationTokenSource _cts;                 // завершение потока
-//  public readonly Task WaiteEvent;
-//  private Action<MapCommands> _callBack;            // Инициализация пустым делегатом передать данные на верх
-//  private readonly string _nameModule;
-//  private readonly string _clientName;
-
-//  private readonly ConcurrentQueue<MapCommands> _queue = new();
-//  private readonly ManualResetEventSlim _signal = new(false);
-//  private SateMode _mode;
-//  public ServerMetaData(MetaSettings meta)
-//  {
-//    _meta = meta;
-//    _nameModule = "server" + _meta.MemoryName;
-//    _clientName = "client" + _meta.MemoryName;
-//    _cts = new CancellationTokenSource();
-//    var token = _cts.Token;
-//    SendToClient = new EventWaitHandle(false, EventResetMode.AutoReset, _meta.MetaEventClient);
-//    Md = new BasicMemoryMd(_meta.MetaEventServer, _meta.MetaSize, _meta.ControlName, CallBackMetaData, SendToClient);
-//    //    WaiteEvent = ReadDataCallBack(token);
-//    _mode = SateMode.Initialization;
-
-//    WaiteEvent = ReadDataCallBack(_cts.Token);
-
-//  }
-//  private async Task ReadDataCallBack(CancellationToken cancellationToken = default)
-//  {
-//    int i = 0;
-//    try
-//    {
-//      while (!cancellationToken.IsCancellationRequested)
-//      {
-//        // Ждём новых данных или таймаута 1 сек
-//        if (_signal.Wait(1000, cancellationToken))
-//        {
-//          _signal.Reset();
-
-//          while (_queue.TryDequeue(out var map))
-//          {
-//            // Проверка данные пришли от client
-//            if (map.TryGetValue(MdCommand.State.AsKey(), out var stateValue))
-//            {
-//              if(_clientName != stateValue) continue;
-
-//              switch (_mode)
-//              {
-//                case SateMode.Initialization:
-//                {
-//                  // Проверка в наличии command если "" посылаем запрос "ok" подтверждение
-//                  if (map.TryGetValue(MdCommand.Command.AsKey(), out string commandValue))
-//                  {
-//                    if (commandValue == MdCommand.Ok.AsKey())
-//                    {
-//                      _mode = SateMode.Work;
-//                      continue;
-//                    }
-//                    else
-//                    {
-//                      var mapCommand = new MapCommands()
-//                      {
-//                        [MdCommand.State.AsKey()] = _nameModule,
-//                        [MdCommand.Command.AsKey()] = MdCommand.Ok.AsKey(),
-//                      };
-//                      Md.WriteMetaMap(mapCommand);
-//                      continue;
-//                    }
-//                  }
-//                  else
-//                  {// если нет Command а связь установлена посылаем command = ""
-//                      var mapCommand = new MapCommands()
-//                      {
-//                        [MdCommand.State.AsKey()] = _nameModule,
-//                        [MdCommand.Command.AsKey()] = "",
-//                      };
-//                      Md.WriteMetaMap(mapCommand);
-//                      continue;
-//                  }
-//                  break;
-//                }
-//                case SateMode.Work:
-//                { // если SateMode.Work разбираем map на управляющие значения для обработки данных
-
-//                    break;
-//                }
-//                case SateMode.Dispose:
-//                {
-//                  break;
-//                }
-
-//                case SateMode.None:
-//                default:
-//                  throw new ArgumentOutOfRangeException();
-//              }
-
-//            }
-
-//          }
-//        }
-
-//        // Ваши действия по циклу каждую секунду
-//        var mapToWrite = new MapCommands()
-//        {
-//          [MdCommand.State.AsKey()] = _nameModule,
-//          ["id_server"] = i.ToString(),
-//        };
-//        Md.WriteMetaMap(mapToWrite); // пишем pong
-//        i++;
-//      }
-//    }
-//    catch (OperationCanceledException)
-//    {
-//      // Обычное завершение
-//    }
-//    catch (Exception ex)
-//    {
-//      Console.WriteLine($"Ошибка в ReadDataCallBack: {ex}");
-//    }
-//  }
-
-//  //private void ParserComman
-//  private void CallBackMetaData(MapCommands map)
-//  {
-//    if(map == null || map.Count()==0)
-//      return;
-//    // Помещаем данные в очередь, сигналим цикл
-//    _queue.Enqueue(map);
-//    _signal.Set();
-
-//    foreach (var kv in map)
-//      Console.WriteLine($" - внешний уровень server == >  {kv.Key} = {kv.Value}");
-//  }
-
-//  public void Dispose()
-//  {
-//    Console.WriteLine($"ServerPong  -- Dispose() ");
-//    _cts.Cancel();
-//    Task.WaitAll(WaiteEvent);
-//    Md?.Dispose();
-//    _signal.Dispose();
-//  }
-//}
 
