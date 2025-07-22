@@ -32,6 +32,7 @@ public static class ClientServerExtensions
 
 public enum TransferWaiting
 {
+  None,
   Transfer,
   Waiting
 }

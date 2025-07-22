@@ -30,8 +30,31 @@ while (true)
 
   Console.WriteLine($"Tick: {DateTime.Now:HH:mm:ss}  &  count {count}");
   Console.WriteLine($"STATE MODE");
-  Console.WriteLine($"[Server] -> {server._mode}");
-//  Console.WriteLine($"[Client] -> {client._mode}");
+  Console.WriteLine($"[Server] -> {server._mode}   [ПЕРЕДАЧА] {server._transferWaiting} ");
+//  Console.WriteLine($"[Client] -> {client._mode}   {client._transferWaiting} ");
+  /*
+    if (client._mode == SateMode.Work && client._transferWaiting == TransferWaiting.Transfer) 
+    {
+      var map1 = new MapCommands()
+      {
+        [MdCommand.State.AsKey()] = "clientCUDA",
+        ["id_client"] = count.ToString(),
+      };
+      client.WriteMetaMap(map1);   // пишем pong
+      client._transferWaiting = TransferWaiting.Waiting;
+    }
+  */
+
+  if (server._mode == SateMode.Work && server._transferWaiting == TransferWaiting.Transfer)
+  {
+    var map1 = new MapCommands()
+    {
+      [MdCommand.State.AsKey()] = "serverCUDA",
+      ["id_server"] = count.ToString(),
+    };
+    server.WriteMetaMap(map1);   // пишем pong
+    server._transferWaiting = TransferWaiting.Waiting;
+  }
 
   Thread.Sleep(1000);
   count++;

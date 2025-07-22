@@ -59,10 +59,11 @@ public class ServerMetaData : IDisposable
     {
       [MdCommand.State.AsKey()] = _nameModule,
     };
+
     Md.WriteMetaMap(initAck);
 
-    _transferWaiting = TransferWaiting.Transfer;
-    
+    _transferWaiting = TransferWaiting.None;
+
     ResetAllTimer();
     SystemPulseTimer.On250MilSec += () =>
     { /* действия каждые 0.25 сек */
@@ -118,7 +119,8 @@ public class ServerMetaData : IDisposable
           if (cmdVal == MdCommand.Ok.AsKey())
           {
             _mode = SateMode.Work;
-            Console.WriteLine(">>> Handshake подтверждён, переход в Work");
+            _transferWaiting = TransferWaiting.Transfer;
+            Console.WriteLine(">>> Handshake подтверждён, переход в [SERVER] Work");
             return;
           }
           else if (cmdVal == "_")
@@ -130,8 +132,9 @@ public class ServerMetaData : IDisposable
               [MdCommand.Command.AsKey()] = MdCommand.Ok.AsKey()
             };
             Md.WriteMetaMap(reply);
-            Console.WriteLine(">>> Server Отправили ok для завершения handhsake");
+            Console.WriteLine(">>> Server Отправили ok для завершения [SERVER]  handhsake");
             _mode = SateMode.Work;
+            _transferWaiting = TransferWaiting.Transfer;
             return;
           }
         }
@@ -145,32 +148,53 @@ public class ServerMetaData : IDisposable
         Md.WriteMetaMap(initAck);
         Console.WriteLine(">>> Отправили пустой command server → client");
         break;
-    }
-
-    case SateMode.Work:
-      {
-          //  Когда будут посылаться данные ставится TransferWaiting.Waiting !!
-          // Здесь будет основная логика работы: приём данных, реакции, управление
-          Console.WriteLine(">>> Работаем: получили данные в режиме Work");
-          // 👇 Пока ничего не шлём, ждём команды подтверждения
-
-          if (map.TryGetValue(MdCommand.Command.AsKey(), out var cmdVal))
-            if (cmdVal == MdCommand.Ok.AsKey())
-            {
-//              _mode = SateMode.Work;
-              _transferWaiting = TransferWaiting.Transfer;   // подтверждение, что данные были приняты
-              Console.WriteLine(">>> Handshake подтверждён, переход в Work");
-              return;
-            }
-
       }
 
+      case SateMode.Work:
+      {
+        //  Когда будут посылаться данные ставится TransferWaiting.Waiting !!
+        // Здесь будет основная логика работы: приём данных, реакции, управление
+        Console.WriteLine(">>> Работаем: получили данные в режиме SERVER Work");
+        // 👇 Пока ничего не шлём, ждём команды подтверждения
 
-    break;
+        if (map.Count == 1) return;
 
-      case SateMode.Dispose:
-        Console.WriteLine(">>> Завершаем работу");
+        if (map.TryGetValue(MdCommand.Command.AsKey(), out var cmdVal))
+        {
+          if (cmdVal == MdCommand.Ok.AsKey())
+          {
+//              _mode = SateMode.Work;
+            _transferWaiting = TransferWaiting.Transfer; // подтверждение, что данные были приняты
+            Console.WriteLine(">>> Handshake подтверждён, переход в SERVER Work");
+            return;
+          }
+        }
+        else
+        {
+
+          var searchTerms = new List<string> { MdCommand.State.AsKey(), "id" };
+//          var lsKey = ;
+          var matchedKeys = map.Keys.ToList()
+            .Where(key => searchTerms.Any(term => key.Contains(term, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+          if (matchedKeys.Count == 0)
+            return;
+
+          //if()
+          foreach (string kv in matchedKeys)
+            Console.WriteLine($" - внешний уровень [client] !!!!  в SERVER  == >  {kv} = {map[kv]}");
+          //  обработка данных
+          map.Clear();
+          map.Add(MdCommand.State.AsKey(), _nameModule);
+          map.Add(MdCommand.Command.AsKey(), MdCommand.Ok.AsKey());
+          _transferWaiting = TransferWaiting.Transfer;
+          Md.WriteMetaMap(map);
+        }
         break;
+      }
+      case SateMode.Dispose:
+          Console.WriteLine(">>> Завершаем работу");
+          break;
 
       case SateMode.None:
       default:
@@ -282,6 +306,10 @@ public class ServerMetaData : IDisposable
   public void SetSateMode(SateMode sm) => _mode = sm;
   #endregion
 
+  public void WriteMetaMap(MapCommands map)
+  {
+    Md.WriteMetaMap(map);
+  }
 }
 
 
