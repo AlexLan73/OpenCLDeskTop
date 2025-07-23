@@ -34,22 +34,22 @@ public class ModuleCore( ServerClient serverClient) : MemoryNomeNew("Cuda", serv
         {
           case DataTypeIds.Logger:
             var lsLoggers = MessagePackSerializer.Deserialize<string[]>(dMetaData.Bytes);
-            Console.WriteLine($"  -> Тип: CudaVector[]. Количество: {lsLoggers.Length}");
+            Console.WriteLine($"  -> Тип: Vector[]. Количество: {lsLoggers.Length}");
             Console.WriteLine(
               $"  -> Первое значение первого вектора: {lsLoggers[0]}\n  ----- {lsLoggers[0]}\n");
 
             break;
 
           case DataTypeIds.CudaVector:
-            var vectors = MessagePackSerializer.Deserialize<CudaVector[]>(dMetaData.Bytes);
-            Console.WriteLine($"  -> Тип: CudaVector[]. Количество: {vectors.Length}");
+            var vectors = MessagePackSerializer.Deserialize<Vector[]>(dMetaData.Bytes);
+            Console.WriteLine($"  -> Тип: Vector[]. Количество: {vectors.Length}");
             Console.WriteLine(
               $"  -> Первое значение первого вектора: {vectors.FirstOrDefault()?.Values.FirstOrDefault()}");
             break;
 
           case DataTypeIds.CudaDateTimeVariable:
-            var vars = MessagePackSerializer.Deserialize<CudaDateTimeVariable[]>(dMetaData.Bytes);
-            Console.WriteLine($"  -> Тип: CudaDateTimeVariable[]. Количество: {vars.Length}");
+            var vars = MessagePackSerializer.Deserialize<DateTimeVariable[]>(dMetaData.Bytes);
+            Console.WriteLine($"  -> Тип: DateTimeVariable[]. Количество: {vars.Length}");
             Console.WriteLine($"  -> Первая переменная: {vars.FirstOrDefault()?.Variable}");
             break;
 

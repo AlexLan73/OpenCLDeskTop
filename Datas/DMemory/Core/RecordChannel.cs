@@ -29,9 +29,25 @@ public record Logger(
 
 );
 
+[MessagePackObject]
+public record DTVariable(
+  [property: Key(0)] uint Id,
+  [property: Key(1)] DateTime Tic, // формат 2025.06.24 20:23:15.3423..
+  [property: Key(2)] double Variable
+);
+
+// == 2 ==
+[MessagePackObject]
+public record VectorId(
+  [property: Key(0)] uint Id,
+  [property: Key(1)] double[] Values
+);
+
+
+
 // == 1 ==
 [MessagePackObject]
-public record CudaDateTimeVariable(
+public record DateTimeVariable(
   [property: Key(0)] uint Id,
   [property: Key(1)] DateTime DateTime, // формат 2025.06.24 20:23:15.3423..
   [property: Key(2)] float Variable
@@ -39,7 +55,7 @@ public record CudaDateTimeVariable(
 
 // == 2 ==
 [MessagePackObject]
-public record CudaVector(
+public record Vector(
   [property: Key(0)] uint Id,
   [property: Key(1)] double[] Values
 );

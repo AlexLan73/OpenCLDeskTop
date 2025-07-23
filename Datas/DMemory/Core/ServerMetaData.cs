@@ -2,6 +2,8 @@
 using DMemory.Enum;
 
 namespace DMemory.Core;
+
+
 using MapCommands = Dictionary<string, string>;
 
 
@@ -51,6 +53,7 @@ public class ServerMetaData : IDisposable
     _transferWaiting = TransferWaiting.None;
 
     _timer.ResetAll();
+
     SystemPulseTimer.On250MilSec += () =>
     { /* действия каждые 0.25 сек */
       if (_mode == SateMode.Work)
@@ -105,7 +108,7 @@ public class ServerMetaData : IDisposable
       {
         if (map.TryGetValue(MdCommand.Command.AsKey(), out var cmdVal))
         {
-          _timer.ResetWorkProtocol();
+//          _timer.ResetWorkProtocol();
           if (cmdVal == MdCommand.Ok.AsKey())
           {
             _mode = SateMode.Work;
@@ -122,11 +125,11 @@ public class ServerMetaData : IDisposable
               [MdCommand.State.AsKey()] = _nameModule,
               [MdCommand.Command.AsKey()] = MdCommand.Ok.AsKey()
             };
-            Md.WriteMetaMap(reply);
             Console.WriteLine(">>> Server Отправили ok для завершения [SERVER]  handhsake");
             _mode = SateMode.Work;
-            _timer.ResetInitialization();
             _transferWaiting = TransferWaiting.Transfer;
+            _timer.ResetInitialization();
+            Md.WriteMetaMap(reply);
             return;
           }
         }
@@ -236,7 +239,7 @@ public class ServerMetaData : IDisposable
 
     if (_mode == SateMode.Initialization && (_timer.GetInitialization()% 5  == 1))
     { // время вышло связи нет переходим на начальный уровень
-      _mode = SateMode.Initialization;
+//      _mode = SateMode.Initialization;
       _transferWaiting = TransferWaiting.None;
 
       _timer.ResetWork();
