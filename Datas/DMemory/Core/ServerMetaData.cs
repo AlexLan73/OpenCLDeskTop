@@ -43,6 +43,7 @@ public class ServerMetaData : IDisposable
     );
     
     _mode = SateMode.Initialization;
+    _transferWaiting = TransferWaiting.None;
     var initAck = new MapCommands
     {
       [MdCommand.State.AsKey()] = _nameModule,
@@ -50,7 +51,6 @@ public class ServerMetaData : IDisposable
 
     Md.WriteMetaMap(initAck);
 
-    _transferWaiting = TransferWaiting.None;
 
     _timer.ResetAll();
 
@@ -152,7 +152,7 @@ public class ServerMetaData : IDisposable
         Console.WriteLine(">>> Работаем: получили данные в режиме SERVER Work");
         // 👇 Пока ничего не шлём, ждём команды подтверждения
 
-        if (map.Count == 1) return;
+        if (map.Count < 2) return;
         _timer.ResetWork();
         _timer.ResetWorkSendCount();
         if (map.TryGetValue(MdCommand.Command.AsKey(), out var cmdVal))

@@ -30,15 +30,15 @@ public class CudaMem(ServerClient serverClient) : MemoryNome("Cuda", serverClien
         {
           case DataTypeIds.Logger:
             var lsLoggers = MessagePackSerializer.Deserialize<string[]>(dMetaData.Bytes);
-            Console.WriteLine($"  -> Тип: Vector[]. Количество: {lsLoggers.Length}");
+            Console.WriteLine($"  -> Тип: VectorID[]. Количество: {lsLoggers.Length}");
             Console.WriteLine(
               $"  -> Первое значение первого вектора: {lsLoggers[0]}\n  ----- {lsLoggers[0]}\n");
 
             break;
 
           case DataTypeIds.CudaVector:
-            var vectors = MessagePackSerializer.Deserialize<Vector[]>(dMetaData.Bytes);
-            Console.WriteLine($"  -> Тип: Vector[]. Количество: {vectors.Length}");
+            var vectors = MessagePackSerializer.Deserialize<VectorId[]>(dMetaData.Bytes);
+            Console.WriteLine($"  -> Тип: VectorID[]. Количество: {vectors.Length}");
             Console.WriteLine(
               $"  -> Первое значение первого вектора: {vectors.FirstOrDefault()?.Values.FirstOrDefault()}");
             break;

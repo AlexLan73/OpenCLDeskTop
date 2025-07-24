@@ -1,10 +1,13 @@
-﻿using System;
+﻿using Common.Constants;
+using DMemory.Core.Channel;
+using Force.Crc32;
+using MessagePack;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO.MemoryMappedFiles;
+using System.Reflection;
 using System.Threading.Tasks;
-using MessagePack;
-using Force.Crc32;
 using MapCommands = System.Collections.Generic.Dictionary<string, string>;
 
 public record RamData(object Data, Type DataType, MapCommands MetaData);
@@ -14,24 +17,75 @@ namespace DMemory.Core {
   {
     private readonly string _memoryName;
     private readonly int _memorySize = 64 * 1024;
-    private readonly ConcurrentQueue<RamData> _dataQueue;
+    private readonly ConcurrentQueue<RamData> _dataQueue = new ();
     private readonly Dictionary<string, Type> _typeMapping;
     private MemoryMappedFile _mmf;
     private MemoryMappedViewAccessor _accessor;
+    private readonly CancellationTokenSource _cts = new();
+    private readonly Task _workerTask;
+    //  TypeFromNamespace
+    //  { public static Dictionary<string, Type> GetTypeMappingFromNamespace(
+    //
 
     // Делегат для callback в ServerMetaData 
     private readonly Action<MapCommands> _metaDataCallback;
 
-    public MemoryDataProcessor(string memoryName, ConcurrentQueue<RamData> dataQueue, Dictionary<string, Type> typeMapping, Action<MapCommands> metaDataCallback)
+//    public MemoryDataProcessor(string memoryName, ConcurrentQueue<RamData> dataQueue, Dictionary<string, Type> typeMapping, Action<MapCommands> metaDataCallback)
+    public MemoryDataProcessor(string memoryName,  Action<MapCommands> metaDataCallback)
     {
+      _typeMapping = GetTypeMappingFromNamespace("Channel");
+
       _memoryName = memoryName ?? throw new ArgumentNullException(nameof(memoryName));
-      _dataQueue = dataQueue ?? throw new ArgumentNullException(nameof(dataQueue));
-      _typeMapping = typeMapping ?? throw new ArgumentNullException(nameof(typeMapping));
+//      _dataQueue = dataQueue ?? throw new ArgumentNullException(nameof(dataQueue));
+//      _typeMapping = typeMapping ?? throw new ArgumentNullException(nameof(typeMapping));
       _metaDataCallback = metaDataCallback ?? throw new ArgumentNullException(nameof(metaDataCallback));
 
       _mmf = MemoryMappedFile.CreateOrOpen(_memoryName, _memorySize, MemoryMappedFileAccess.ReadWrite);
       _accessor = _mmf.CreateViewAccessor(0, _memorySize, MemoryMappedFileAccess.ReadWrite);
+      _workerTask = Task.Run(() => ProcessQueueAsync(_cts.Token));
     }
+
+    private async Task ProcessQueueAsync(CancellationToken ct)
+    {
+      while (!ct.IsCancellationRequested)
+      {
+        if (_dataQueue.TryDequeue(out var ramData))
+        {
+          try
+          {
+            await SerializeAndWriteAsync(ramData);
+          }
+          catch (Exception ex)
+          {
+            Console.WriteLine($"Ошибка в обработке данных: {ex}");
+          }
+        }
+        else
+        {
+          // Очередь пуста — подождать 1 секунду
+          await Task.Delay(1000, ct);
+        }
+      }
+    }
+
+    private Dictionary<string, Type> GetTypeMappingFromNamespace(string targetNamespace = "Channel")
+    {
+      Assembly asm = Assembly.GetExecutingAssembly();
+      var __rr = asm.GetTypes();
+
+      var types = asm.GetTypes()
+        .Where(t => t.Namespace != null && t.IsClass && t.Namespace.Contains(targetNamespace))
+        .ToList();
+
+      var mapping = new Dictionary<string, Type>();
+      foreach (var type in types)
+      {
+        mapping[type.Name] = type;
+        mapping[type.Name + "[]"] = type.MakeArrayType();
+      }
+      return mapping;
+    }
+
 
     public string ProcessMetaData(MapCommands metaData)
     {

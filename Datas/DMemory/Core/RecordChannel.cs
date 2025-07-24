@@ -1,4 +1,6 @@
-﻿namespace DMemory.Core;
+﻿using Common.Core.Channel;
+
+namespace DMemory.Core;
 // <summary>
 /// Статический класс для хранения уникальных идентификаторов типов данных.
 /// </summary>
@@ -11,14 +13,14 @@ public static class DataTypeIds
   public const uint RecResult = 4; // Этот тип используется внутри CudaDtRecord
   public const uint CudaDtRecord = 5;
 }
-
+/*
 public enum LoggerSendEnumMemory
 {
   Error = -1,
   Info = 0,
   Warning = 1
 }
-
+*/
 // == 0 ==
 [MessagePackObject]
 public record Logger(
@@ -53,12 +55,6 @@ public record DateTimeVariable(
   [property: Key(2)] float Variable
   );
 
-// == 2 ==
-[MessagePackObject]
-public record Vector(
-  [property: Key(0)] uint Id,
-  [property: Key(1)] double[] Values
-);
 
 // Важно: MessagePack сериализует двумерный массив double[,] как вложенный массив.
 // На стороне C++ мы будем обрабатывать это как плоский вектор с размерами I и J.

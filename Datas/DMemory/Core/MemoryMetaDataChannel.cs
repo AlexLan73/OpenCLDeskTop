@@ -9,7 +9,6 @@ public class MemoryMetaDataChannel : IDisposable
   private readonly EventWaitHandle _eventHandle;
   private readonly int _controlSize = 8192;
   private bool _disposed = false;
-
   public string Name { get; }
   public string Role { get; } // "server" или "client"
 

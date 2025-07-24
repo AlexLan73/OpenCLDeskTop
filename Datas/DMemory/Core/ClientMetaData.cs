@@ -1,5 +1,7 @@
-﻿using DMemory.Enum;
+﻿using Common.Event;
+using DMemory.Enum;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -19,9 +21,12 @@ public class ClientMetaData : IDisposable
   private readonly string _nameModule;
   private readonly string _clientName;
   public TransferWaiting _transferWaiting;// Используется только для подтверждения ответа в режиме Work
-
-
+  private MemoryDataProcessor _memDP;
   public SateMode _mode;
+  private ConcurrentQueue<RamData> _dataQueue = new ConcurrentQueue<RamData>();
+  #region ===_ Time _===
+  private readonly ServerMetaDataTimer _timer = new ServerMetaDataTimer();
+  #endregion
 
   public ClientMetaData(MetaSettings meta)
   {
@@ -41,17 +46,57 @@ public class ClientMetaData : IDisposable
     );
 
     _mode = SateMode.Initialization;
+    _memDP = new MemoryDataProcessor(meta.MemoryName, _dataQueue, MetaDataCallback);
     _transferWaiting = TransferWaiting.None;
     // Старт фона (будет использоваться при добавлении таймов)
+
+    SystemPulseTimer.On250MilSec += () =>
+    { /* действия каждые 0.25 сек */
+      if (_mode == SateMode.Work)
+      {
+        _timer._timeWork = _timer.IncWork();
+      }
+      else
+        _timer.ResetWork();
+    };
+
+    SystemPulseTimer.On250MilSec += Comparison250MilSec;
+
+    SystemPulseTimer.On1Second += () =>
+    {
+      if (_mode == SateMode.Initialization)
+        _timer._timeInitialization = _timer.IncInitialization();
+      else
+        _timer.ResetInitialization();
+    };
+    SystemPulseTimer.On1Second += Comparison1SecTimer;
+
+    SystemPulseTimer.On5Seconds += () =>
+    {
+      _timer._timeGeneralWork = _timer.IncGeneralWork();
+    };
+
+    SystemPulseTimer.Start();
+
     Thread.Sleep(200);
-    var reply = new MapCommands
+    var initAck = new MapCommands
     {
       [MdCommand.State.AsKey()] = _nameModule,
     };
-    Md.WriteMetaMap(reply);
+    Md.WriteMetaMap(initAck);
+
+    _timer.ResetAll();
+
     WaiteEvent = Task.CompletedTask;
+
   }
 
+  private void MetaDataCallback(MapCommands map)
+  {
+    // получаем MD для пересылки дынных 
+    // если канал свободен посылаем
+
+  }
   private void CallBackMetaData(MapCommands map)
   {
     if (map == null || map.Count == 0)
@@ -67,7 +112,9 @@ public class ClientMetaData : IDisposable
 
     foreach (var kv in map)
       Console.WriteLine($" - {kv.Key} = {kv.Value}");
-
+    
+    _timer.ResetGeneralWork();
+    
     switch (_mode)
     {
       case SateMode.Initialization:
@@ -77,9 +124,10 @@ public class ClientMetaData : IDisposable
           if (cmdVal == MdCommand.Ok.AsKey())
           {
             _mode = SateMode.Work;
-            Console.WriteLine(">>> Handshake подтверждён, переход в Work");
             _mode = SateMode.Work;
             _transferWaiting = TransferWaiting.Transfer;
+            _timer.ResetInitialization();
+            Console.WriteLine(">>> Handshake подтверждён, переход в Work");
             return;
           }
           else if (cmdVal == "_")
@@ -90,10 +138,11 @@ public class ClientMetaData : IDisposable
               [MdCommand.State.AsKey()] = _nameModule,
               [MdCommand.Command.AsKey()] = MdCommand.Ok.AsKey()
             };
-            Md.WriteMetaMap(reply);
             Console.WriteLine(">>> Client Отправили ok для завершения handhsake");
             _mode = SateMode.Work;
+            _timer.ResetInitialization();
             _transferWaiting = TransferWaiting.Transfer;
+            Md.WriteMetaMap(reply);
             return;
           }
         }
@@ -118,7 +167,9 @@ public class ClientMetaData : IDisposable
           Console.WriteLine(">>> Работаем: получили данные в режиме CLIENT Work");
           // 👇 Пока ничего не шлём, ждём команды подтверждения
 
-          if (map.Count == 1) return;
+          if (map.Count < 2) return;
+          _timer.ResetWork();
+          _timer.ResetWorkSendCount();
 
           if (map.TryGetValue(MdCommand.Command.AsKey(), out var cmdVal))
           {
@@ -162,6 +213,73 @@ public class ClientMetaData : IDisposable
         throw new ArgumentOutOfRangeException(nameof(_mode), _mode, null);
     }
   }
+  #region ===-- Comparison1SecTimer ---
+  private void Comparison250MilSec()
+  {
+    if (_mode == SateMode.Work && _timer.GetWork() > _timer._CompelWork)
+    {
+      _timer.ResetWork();
+      var initAck = new MapCommands
+      {
+        [MdCommand.State.AsKey()] = _nameModule,
+        [MdCommand.Command.AsKey()] = "_"
+      };
+      Md.WriteMetaMap(initAck);
+      _timer._workSendCount = _timer.IncWorkSendCount();
+    }
+  }
+  private void Comparison1SecTimer()
+  {
+
+    if (_mode == SateMode.Work && _timer.GetInitialization() > _timer._CompeGeneralWork)
+    { // время вышло связи нет переходим на начальный уровень
+      _mode = SateMode.Initialization;
+      _timer.ResetWork();
+      _timer.ResetInitialization();
+      _transferWaiting = TransferWaiting.None;
+
+      var initAck = new MapCommands
+      {
+        [MdCommand.State.AsKey()] = _nameModule,
+        [MdCommand.Command.AsKey()] = "_"
+      };
+      Md.WriteMetaMap(initAck);
+      return;
+    }
+
+    if (_mode == SateMode.Initialization && (_timer.GetInitialization() % 5 == 1))
+    { // время вышло связи нет переходим на начальный уровень
+      //      _mode = SateMode.Initialization;
+      _transferWaiting = TransferWaiting.None;
+
+      _timer.ResetWork();
+      //      ResetInitialization();
+      var initAck = new MapCommands
+      {
+        [MdCommand.State.AsKey()] = _nameModule,
+        [MdCommand.Command.AsKey()] = "_"
+      };
+      Md.WriteMetaMap(initAck);
+      return;
+    }
+
+    if (_mode == SateMode.Work && _timer.GetWorkSendCount() > _timer._CompelWorkSendCount)
+    {
+      _mode = SateMode.Initialization;
+      _timer.ResetWork();
+      _timer.ResetInitialization();
+      _timer.ResetWorkSendCount();
+      var initAck = new MapCommands
+      {
+        [MdCommand.State.AsKey()] = _nameModule,
+        [MdCommand.Command.AsKey()] = "_"
+      };
+      Md.WriteMetaMap(initAck);
+      _timer._workSendCount = _timer.IncWorkSendCount();
+    }
+  }
+  #endregion
+
 
   public void Dispose()
   {
