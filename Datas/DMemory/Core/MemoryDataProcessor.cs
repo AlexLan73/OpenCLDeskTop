@@ -8,71 +8,90 @@ using System.Collections.Generic;
 using System.IO.MemoryMappedFiles;
 using System.Reflection;
 using System.Threading.Tasks;
+using Common.Core.Channel;
 using MapCommands = System.Collections.Generic.Dictionary<string, string>;
 
-public record RamData(object Data, Type DataType, MapCommands MetaData);
+//public record RamData(object Data, Type DataType, MapCommands MetaData);
 
 namespace DMemory.Core {
   public class MemoryDataProcessor : IDisposable
   {
+
+    // Событие — метаданные подготовлены для передачи
+    public event EventHandler<MapCommands> MetaReady;
+
+    // Временное хранилище
+    private (RamData Data, byte[] Buffer, MapCommands Meta)? _pending;
+
     private readonly string _memoryName;
     private readonly int _memorySize = 64 * 1024;
-    private readonly ConcurrentQueue<RamData> _dataQueue = new ();
     private readonly Dictionary<string, Type> _typeMapping;
     private MemoryMappedFile _mmf;
     private MemoryMappedViewAccessor _accessor;
-    private readonly CancellationTokenSource _cts = new();
-    private readonly Task _workerTask;
+
+    // Событие обратного вызова для успешного получения и десериализации RamData
+    private readonly Action<RamData> _onDataReceived;
+
+
     //  TypeFromNamespace
     //  { public static Dictionary<string, Type> GetTypeMappingFromNamespace(
     //
 
     // Делегат для callback в ServerMetaData 
-    private readonly Action<MapCommands> _metaDataCallback;
+    //    private readonly Action<MapCommands> _metaDataCallback;
 
-//    public MemoryDataProcessor(string memoryName, ConcurrentQueue<RamData> dataQueue, Dictionary<string, Type> typeMapping, Action<MapCommands> metaDataCallback)
-    public MemoryDataProcessor(string memoryName,  Action<MapCommands> metaDataCallback)
+    //    public MemoryDataProcessor(string memoryName, ConcurrentQueue<RamData> dataQueue, Dictionary<string, Type> typeMapping, Action<MapCommands> metaDataCallback)
+    public MemoryDataProcessor(string memoryName, Action<RamData> onDataReceived)
     {
-      _typeMapping = GetTypeMappingFromNamespace("Channel");
+//      _typeMapping = GetTypeMappingFromNamespace("Channel");
+//      _onDataReceived = onDataReceived;
+//      _memoryName = memoryName ?? throw new ArgumentNullException(nameof(memoryName));
+////      _dataQueue = dataQueue ?? throw new ArgumentNullException(nameof(dataQueue));
+////      _typeMapping = typeMapping ?? throw new ArgumentNullException(nameof(typeMapping));
+////      _metaDataCallback = metaDataCallback ?? throw new ArgumentNullException(nameof(metaDataCallback));
+
+//      _mmf = MemoryMappedFile.CreateOrOpen(_memoryName, _memorySize, MemoryMappedFileAccess.ReadWrite);
+//      _accessor = _mmf.CreateViewAccessor(0, _memorySize, MemoryMappedFileAccess.ReadWrite);
 
       _memoryName = memoryName ?? throw new ArgumentNullException(nameof(memoryName));
-//      _dataQueue = dataQueue ?? throw new ArgumentNullException(nameof(dataQueue));
-//      _typeMapping = typeMapping ?? throw new ArgumentNullException(nameof(typeMapping));
-      _metaDataCallback = metaDataCallback ?? throw new ArgumentNullException(nameof(metaDataCallback));
+      // Инициализация маппинга типов (пример, ваш код может быть другим)
+      _typeMapping = GetTypeMappingFromNamespace("Channel");
+
+      _onDataReceived = onDataReceived ?? throw new ArgumentNullException(nameof(onDataReceived));
 
       _mmf = MemoryMappedFile.CreateOrOpen(_memoryName, _memorySize, MemoryMappedFileAccess.ReadWrite);
       _accessor = _mmf.CreateViewAccessor(0, _memorySize, MemoryMappedFileAccess.ReadWrite);
-      _workerTask = Task.Run(() => ProcessQueueAsync(_cts.Token));
     }
 
-    private async Task ProcessQueueAsync(CancellationToken ct)
+    public void SerializeAndPrepare(RamData ramData)
     {
-      while (!ct.IsCancellationRequested)
+      if (ramData == null) throw new ArgumentNullException(nameof(ramData));
+      // ... сериализация ...
+      byte[] serialized = MessagePackSerializer.Serialize(ramData.DataType, ramData.Data);
+      string crc = Crc32Helper.Compute(serialized);
+
+      var meta = new MapCommands(ramData.MetaData)
       {
-        if (_dataQueue.TryDequeue(out var ramData))
-        {
-          try
-          {
-            await SerializeAndWriteAsync(ramData);
-          }
-          catch (Exception ex)
-          {
-            Console.WriteLine($"Ошибка в обработке данных: {ex}");
-          }
-        }
-        else
-        {
-          // Очередь пуста — подождать 1 секунду
-          await Task.Delay(1000, ct);
-        }
-      }
+        ["type"] = ramData.DataType.IsArray ? ramData.DataType.Name + "[]" : ramData.DataType.Name,
+        ["size"] = serialized.Length.ToString(),
+        ["crc"] = crc
+      };
+
+      _pending = (ramData, serialized, meta);
+
+      // Вызовем событие — метаданные готовы!
+      MetaReady?.Invoke(this, meta);
+    }
+
+    public void CommitWrite() 
+    {
+      if (_pending != null)
+        _accessor.WriteArray(0, _pending.Value.Buffer, 0, _pending.Value.Buffer.Length);
     }
 
     private Dictionary<string, Type> GetTypeMappingFromNamespace(string targetNamespace = "Channel")
     {
-      Assembly asm = Assembly.GetExecutingAssembly();
-      var __rr = asm.GetTypes();
-
+      var asm = Assembly.GetExecutingAssembly();
       var types = asm.GetTypes()
         .Where(t => t.Namespace != null && t.IsClass && t.Namespace.Contains(targetNamespace))
         .ToList();
@@ -85,7 +104,6 @@ namespace DMemory.Core {
       }
       return mapping;
     }
-
 
     public string ProcessMetaData(MapCommands metaData)
     {
@@ -118,7 +136,9 @@ namespace DMemory.Core {
           return "no";
 
         var ramData = new RamData(deserializedObj, dataType, new MapCommands(metaData));
-        _dataQueue.Enqueue(ramData);
+
+        // Вызов события с готовыми данными — уведомляем "верх"
+        _onDataReceived?.Invoke(ramData);
 
         return "ok";
       }
@@ -126,43 +146,6 @@ namespace DMemory.Core {
       {
         Console.WriteLine($"[MemoryDataProcessor] Ошибка десериализации: {ex.Message}");
         return "no";
-      }
-    }
-
-    public async Task<bool> SerializeAndWriteAsync(RamData ramData)
-    {
-      if (ramData == null) throw new ArgumentNullException(nameof(ramData));
-      if (ramData.Data == null) throw new ArgumentException("Data in RamData cannot be null");
-
-      try
-      {
-        byte[] serialized = MessagePackSerializer.Serialize(ramData.DataType, ramData.Data);
-
-        if (serialized.Length > _memorySize)
-          throw new InvalidOperationException($"Serialized data size ({serialized.Length}) превышает {_memorySize} байт.");
-
-        string crc = Crc32Helper.Compute(serialized);
-
-        _accessor.WriteArray(0, serialized, 0, serialized.Length);
-
-        var updatedMetaData = new MapCommands(ramData.MetaData)
-        {
-          ["type"] = ramData.DataType.IsArray ? ramData.DataType.Name + "[]" : ramData.DataType.Name,
-          ["size"] = serialized.Length.ToString("X"),
-          ["crc"] = crc
-        };
-
-        // Вызов callback вместо события
-        _metaDataCallback(updatedMetaData);
-
-        await Task.CompletedTask;
-
-        return true;
-      }
-      catch (Exception ex)
-      {
-        Console.WriteLine($"[MemoryDataProcessor] Ошибка сериализации и записи: {ex}");
-        return false;
       }
     }
 
@@ -183,25 +166,3 @@ namespace DMemory.Core {
   }
 }
 
-
-/*
- Как из ServerMetaData создать и использовать MemoryDataProcessor:
-
-var dataQueue = new ConcurrentQueue<RamData>();
-   
-   var typeMapping = new Dictionary<string, Type>()
-   {
-       { "Logger", typeof(Logger) },
-       { "DTVariable", typeof(DTVariable) },
-       { "VectorId", typeof(VectorId) },
-       { "VectorId[]", typeof(VectorId[]) }
-   };
-   
-   var processor = new MemoryDataProcessor("SharedMemoryName", dataQueue, typeMapping, updatedMeta =>
-   {
-       // Callback, который вызывается при обновлении метаданных
-       this.WriteMetaMap(updatedMeta);
-   });
-   
-
- */

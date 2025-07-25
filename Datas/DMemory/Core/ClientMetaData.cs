@@ -3,19 +3,67 @@ using DMemory.Enum;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Common.Core.Channel;
 
+/*
+ 
+ public class ClientMetaData
+   {
+       private readonly MemoryDataProcessor _processor;
+       private readonly ConcurrentQueue<RamData> _txQueue = new();
+   
+       public ClientMetaData(MemoryDataProcessor processor)
+       {
+           _processor = processor;
+           _processor.MetaReady += OnMetaReady;
+       }
+   
+       public void EnqueueToSend(RamData data)
+       {
+           _txQueue.Enqueue(data);
+           TrySendNext();
+       }
+   
+       private void TrySendNext()
+       {
+           if (_txQueue.TryPeek(out var data))
+           {
+               _processor.SerializeAndPrepare(data);
+               // Дальше не ждём — реакция будет по событию!
+           }
+       }
+   
+       private void OnMetaReady(object sender, MapCommands meta)
+       {
+           // Здесь можем добавить управляющие ключи к meta
+           // Далее — отправить meta на сервер
+   
+           // Получили "разрешение на запись" (по логике канала):
+           if (_processor.CommitWrite())
+           {
+               // После подтверждения сервера — FinishSend()
+               // Удалить данные из очереди, повторить TrySendNext, если есть
+           }
+       }
+   }
+   
+ */
 namespace DMemory.Core;
 using MapCommands = Dictionary<string, string>;
 
 public class ClientMetaData : IDisposable
 {
+  private MapCommands? _metadataSend = null;
+  private readonly MemoryDataProcessor _processor;
+  private readonly ConcurrentQueue<RamData> _txQueue = new();
+
   public BasicMemoryMd Md;
   public EventWaitHandle sendToServer;
-
-  private readonly CancellationTokenSource _cts;
+  //  private readonly CancellationTokenSource _cts;
   public readonly Task WaiteEvent;
 
   private readonly string _nameModule;
@@ -28,11 +76,16 @@ public class ClientMetaData : IDisposable
   private readonly ServerMetaDataTimer _timer = new ServerMetaDataTimer();
   #endregion
 
-  public ClientMetaData(MetaSettings meta)
+  private readonly CancellationTokenSource _cts = new();
+  private readonly Task _workerTask;
+
+  public ClientMetaData(MetaSettings meta, MemoryDataProcessor processor)
   {
     _nameModule = "client" + meta.MemoryName;
     _clientName = "server" + meta.MemoryName;
 
+    _processor = processor;
+    _processor.MetaReady += OnMetaReady;
     _cts = new CancellationTokenSource();
 
     sendToServer = new EventWaitHandle(false, EventResetMode.AutoReset, meta.MetaEventServer);
@@ -46,7 +99,8 @@ public class ClientMetaData : IDisposable
     );
 
     _mode = SateMode.Initialization;
-    _memDP = new MemoryDataProcessor(meta.MemoryName, _dataQueue, MetaDataCallback);
+//    _memDP = new MemoryDataProcessor(meta.MemoryName);
+
     _transferWaiting = TransferWaiting.None;
     // Старт фона (будет использоваться при добавлении таймов)
 
@@ -87,16 +141,41 @@ public class ClientMetaData : IDisposable
 
     _timer.ResetAll();
 
-    WaiteEvent = Task.CompletedTask;
+//    WaiteEvent = Task.CompletedTask;
+//    _workerTask = Task.Run(() => ProcessQueueAsync(_cts.Token));
 
   }
-
-  private void MetaDataCallback(MapCommands map)
+  public void EnqueueToSend(RamData data)
   {
-    // получаем MD для пересылки дынных 
-    // если канал свободен посылаем
-
+    _txQueue.Enqueue(data);
+    TrySendNext();
   }
+
+  private void TrySendNext()
+  {
+    if (_txQueue.TryPeek(out var data))
+    {
+      _metadataSend = null;
+      _processor.SerializeAndPrepare(data);
+      // Дальше не ждём — реакция будет по событию!
+    }
+  }
+
+  private void OnMetaReady(object sender, MapCommands e)
+  {
+    _metadataSend = e;
+
+    if (_mode != SateMode.Work || _transferWaiting != TransferWaiting.Transfer)
+      return;
+
+    _metadataSend.Add(MdCommand.State.AsKey(), _nameModule);
+    _metadataSend.Add(MdCommand.Data.AsKey(), "");
+    _transferWaiting = TransferWaiting.Waiting;
+    // Получили "разрешение на запись" (по логике канала):
+    _processor.CommitWrite();
+    Md.WriteMetaMap(_metadataSend);
+  }
+
   private void CallBackMetaData(MapCommands map)
   {
     if (map == null || map.Count == 0)
@@ -231,51 +310,60 @@ public class ClientMetaData : IDisposable
   private void Comparison1SecTimer()
   {
 
-    if (_mode == SateMode.Work && _timer.GetInitialization() > _timer._CompeGeneralWork)
-    { // время вышло связи нет переходим на начальный уровень
-      _mode = SateMode.Initialization;
-      _timer.ResetWork();
-      _timer.ResetInitialization();
-      _transferWaiting = TransferWaiting.None;
-
-      var initAck = new MapCommands
-      {
-        [MdCommand.State.AsKey()] = _nameModule,
-        [MdCommand.Command.AsKey()] = "_"
-      };
-      Md.WriteMetaMap(initAck);
-      return;
-    }
-
-    if (_mode == SateMode.Initialization && (_timer.GetInitialization() % 5 == 1))
-    { // время вышло связи нет переходим на начальный уровень
-      //      _mode = SateMode.Initialization;
-      _transferWaiting = TransferWaiting.None;
-
-      _timer.ResetWork();
-      //      ResetInitialization();
-      var initAck = new MapCommands
-      {
-        [MdCommand.State.AsKey()] = _nameModule,
-        [MdCommand.Command.AsKey()] = "_"
-      };
-      Md.WriteMetaMap(initAck);
-      return;
-    }
-
-    if (_mode == SateMode.Work && _timer.GetWorkSendCount() > _timer._CompelWorkSendCount)
+    switch (_mode)
     {
-      _mode = SateMode.Initialization;
-      _timer.ResetWork();
-      _timer.ResetInitialization();
-      _timer.ResetWorkSendCount();
-      var initAck = new MapCommands
+      case SateMode.Work when _timer.GetInitialization() > _timer._CompeGeneralWork:
       {
-        [MdCommand.State.AsKey()] = _nameModule,
-        [MdCommand.Command.AsKey()] = "_"
-      };
-      Md.WriteMetaMap(initAck);
-      _timer._workSendCount = _timer.IncWorkSendCount();
+        // время вышло связи нет переходим на начальный уровень
+        _mode = SateMode.Initialization;
+        _timer.ResetWork();
+        _timer.ResetInitialization();
+        _transferWaiting = TransferWaiting.None;
+
+        var initAck = new MapCommands
+        {
+          [MdCommand.State.AsKey()] = _nameModule,
+          [MdCommand.Command.AsKey()] = "_"
+        };
+        Md.WriteMetaMap(initAck);
+        return;
+      }
+      case SateMode.Initialization when (_timer.GetInitialization() % 5 == 1):
+      {
+        // время вышло связи нет переходим на начальный уровень
+        //      _mode = SateMode.Initialization;
+        _transferWaiting = TransferWaiting.None;
+
+        _timer.ResetWork();
+        //      ResetInitialization();
+        var initAck = new MapCommands
+        {
+          [MdCommand.State.AsKey()] = _nameModule,
+          [MdCommand.Command.AsKey()] = "_"
+        };
+        Md.WriteMetaMap(initAck);
+        return;
+      }
+      case SateMode.Work when _timer.GetWorkSendCount() > _timer._CompelWorkSendCount:
+      {
+        _mode = SateMode.Initialization;
+        _timer.ResetWork();
+        _timer.ResetInitialization();
+        _timer.ResetWorkSendCount();
+        var initAck = new MapCommands
+        {
+          [MdCommand.State.AsKey()] = _nameModule,
+          [MdCommand.Command.AsKey()] = "_"
+        };
+        Md.WriteMetaMap(initAck);
+        _timer._workSendCount = _timer.IncWorkSendCount();
+        break;
+      }
+      case SateMode.None:
+      case SateMode.Dispose:
+        break;
+      default:
+        throw new ArgumentOutOfRangeException();
     }
   }
   #endregion
@@ -296,3 +384,33 @@ public class ClientMetaData : IDisposable
   }
 }
 
+/*
+  private async Task ProcessQueueAsync(CancellationToken ct)
+  {
+    while (!ct.IsCancellationRequested)
+    {
+      if (_dataQueue.TryDequeue(out var ramData))
+      {
+        try
+        {
+          await SerializeAndWriteAsync(ramData);
+        }
+        catch (Exception ex)
+        {
+          Console.WriteLine($"Ошибка в обработке данных: {ex}");
+        }
+      }
+      else
+      {
+        // Очередь пуста — подождать 1 секунду
+        await Task.Delay(1000, ct);
+      }
+    }
+  }
+  */
+//private void MetaDataCallback(MapCommands map)
+//{
+//  // получаем MD для пересылки дынных 
+//  // если канал свободен посылаем
+
+//}

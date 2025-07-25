@@ -8,6 +8,12 @@ using Common.Core.Channel;
 namespace DMemory.Core.Channel;
 
 [MessagePackObject]
+public record DtValues(
+  [property: Key(0)] ulong Tik,
+  [property: Key(1)] double Values
+);
+
+[MessagePackObject]
 public record LoggerChannel(
   [property: Key(0)] uint Id,
   [property: Key(1)] string Module,

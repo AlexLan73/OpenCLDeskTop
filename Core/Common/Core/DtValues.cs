@@ -5,5 +5,6 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace Common.Core;
-
+/*
 public record DtValues(ulong Tik, double Values);
+*/

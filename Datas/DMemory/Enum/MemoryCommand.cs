@@ -2,7 +2,7 @@
 
 public enum MdCommand
 {
-  None, State, Command, Work, Ok, No, Error, Crc
+  None, State, Command, Work, Ok, No, Error, Crc, DataOk, Data
 }
 
 public static class MdCommandExtensions
@@ -16,6 +16,8 @@ public static class MdCommandExtensions
     MdCommand.No => "no",
     MdCommand.Error => "error",
     MdCommand.Crc => "crc",
+    MdCommand.DataOk => "dataok",
+    MdCommand.Data => "data",
     _ => ""
   };
 }
