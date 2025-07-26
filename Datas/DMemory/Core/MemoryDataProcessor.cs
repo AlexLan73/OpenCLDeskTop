@@ -1,5 +1,8 @@
 ﻿using Common.Constants;
+using Common.Core.Channel;
 using DMemory.Core.Channel;
+using DMemory.Enum;
+using DryIoc;
 using Force.Crc32;
 using MessagePack;
 using System;
@@ -8,7 +11,6 @@ using System.Collections.Generic;
 using System.IO.MemoryMappedFiles;
 using System.Reflection;
 using System.Threading.Tasks;
-using Common.Core.Channel;
 using MapCommands = System.Collections.Generic.Dictionary<string, string>;
 
 //public record RamData(object Data, Type DataType, MapCommands MetaData);
@@ -31,27 +33,8 @@ namespace DMemory.Core {
 
     // Событие обратного вызова для успешного получения и десериализации RamData
     private readonly Action<RamData> _onDataReceived;
-
-
-    //  TypeFromNamespace
-    //  { public static Dictionary<string, Type> GetTypeMappingFromNamespace(
-    //
-
-    // Делегат для callback в ServerMetaData 
-    //    private readonly Action<MapCommands> _metaDataCallback;
-
-    //    public MemoryDataProcessor(string memoryName, ConcurrentQueue<RamData> dataQueue, Dictionary<string, Type> typeMapping, Action<MapCommands> metaDataCallback)
     public MemoryDataProcessor(string memoryName, Action<RamData> onDataReceived)
     {
-//      _typeMapping = GetTypeMappingFromNamespace("Channel");
-//      _onDataReceived = onDataReceived;
-//      _memoryName = memoryName ?? throw new ArgumentNullException(nameof(memoryName));
-////      _dataQueue = dataQueue ?? throw new ArgumentNullException(nameof(dataQueue));
-////      _typeMapping = typeMapping ?? throw new ArgumentNullException(nameof(typeMapping));
-////      _metaDataCallback = metaDataCallback ?? throw new ArgumentNullException(nameof(metaDataCallback));
-
-//      _mmf = MemoryMappedFile.CreateOrOpen(_memoryName, _memorySize, MemoryMappedFileAccess.ReadWrite);
-//      _accessor = _mmf.CreateViewAccessor(0, _memorySize, MemoryMappedFileAccess.ReadWrite);
 
       _memoryName = memoryName ?? throw new ArgumentNullException(nameof(memoryName));
       // Инициализация маппинга типов (пример, ваш код может быть другим)
@@ -67,8 +50,8 @@ namespace DMemory.Core {
     {
       if (ramData == null) throw new ArgumentNullException(nameof(ramData));
       // ... сериализация ...
-      byte[] serialized = MessagePackSerializer.Serialize(ramData.DataType, ramData.Data);
-      string crc = Crc32Helper.Compute(serialized);
+      var serialized = MessagePackSerializer.Serialize(ramData.DataType, ramData.Data);
+      var crc = Crc32Helper.Compute(serialized);
 
       var meta = new MapCommands(ramData.MetaData)
       {
@@ -81,6 +64,11 @@ namespace DMemory.Core {
 
       // Вызовем событие — метаданные готовы!
       MetaReady?.Invoke(this, meta);
+    }
+
+    public void ResendData()
+    {
+      if (_pending != null) MetaReady?.Invoke(this, _pending.Value.Meta);
     }
 
     public void CommitWrite() 
@@ -108,44 +96,43 @@ namespace DMemory.Core {
     public string ProcessMetaData(MapCommands metaData)
     {
       if (metaData == null)
-        return "no";
+        return null;
 
-      if (!metaData.TryGetValue("size", out var sizeStr) || !int.TryParse(sizeStr, out int size) || size <= 0 || size > _memorySize)
-        return "no";
+      if (!metaData.TryGetValue("size", out var sizeStr) || !int.TryParse(sizeStr, out var size) || size <= 0 || size > _memorySize)
+        return null;
 
       if (!metaData.TryGetValue("crc", out var crcExpected))
-        return "no";
+        return null;
 
       if (!metaData.TryGetValue("type", out var typeKey))
-        return "no";
+        return null;
 
       if (!_typeMapping.TryGetValue(typeKey, out var dataType))
-        return "no";
+        return null;
 
       try
       {
-        byte[] buffer = new byte[size];
+        var buffer = new byte[size];
         _accessor.ReadArray(0, buffer, 0, size);
 
-        string crcActual = Crc32Helper.Compute(buffer);
+        var crcActual = Crc32Helper.Compute(buffer);
         if (!string.Equals(crcActual, crcExpected, StringComparison.OrdinalIgnoreCase))
-          return "no";
+          return MdCommand.Error.AsKey();
 
-        object deserializedObj = MessagePackSerializer.Deserialize(dataType, buffer);
+        var deserializedObj = MessagePackSerializer.Deserialize(dataType, buffer);
         if (deserializedObj == null)
-          return "no";
+          return MdCommand.Error.AsKey();
 
         var ramData = new RamData(deserializedObj, dataType, new MapCommands(metaData));
 
         // Вызов события с готовыми данными — уведомляем "верх"
         _onDataReceived?.Invoke(ramData);
-
-        return "ok";
+        return MdCommand.DataOk.AsKey(); 
       }
       catch (Exception ex)
       {
         Console.WriteLine($"[MemoryDataProcessor] Ошибка десериализации: {ex.Message}");
-        return "no";
+        return null ;
       }
     }
 
@@ -160,7 +147,7 @@ namespace DMemory.Core {
   {
     public static string Compute(byte[] data)
     {
-      uint crc = Force.Crc32.Crc32Algorithm.Compute(data);
+      var crc = Force.Crc32.Crc32Algorithm.Compute(data);
       return crc.ToString("X8");
     }
   }

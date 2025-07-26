@@ -9,49 +9,6 @@ using System.Text;
 using System.Threading.Tasks;
 using Common.Core.Channel;
 
-/*
- 
- public class ClientMetaData
-   {
-       private readonly MemoryDataProcessor _processor;
-       private readonly ConcurrentQueue<RamData> _txQueue = new();
-   
-       public ClientMetaData(MemoryDataProcessor processor)
-       {
-           _processor = processor;
-           _processor.MetaReady += OnMetaReady;
-       }
-   
-       public void EnqueueToSend(RamData data)
-       {
-           _txQueue.Enqueue(data);
-           TrySendNext();
-       }
-   
-       private void TrySendNext()
-       {
-           if (_txQueue.TryPeek(out var data))
-           {
-               _processor.SerializeAndPrepare(data);
-               // Дальше не ждём — реакция будет по событию!
-           }
-       }
-   
-       private void OnMetaReady(object sender, MapCommands meta)
-       {
-           // Здесь можем добавить управляющие ключи к meta
-           // Далее — отправить meta на сервер
-   
-           // Получили "разрешение на запись" (по логике канала):
-           if (_processor.CommitWrite())
-           {
-               // После подтверждения сервера — FinishSend()
-               // Удалить данные из очереди, повторить TrySendNext, если есть
-           }
-       }
-   }
-   
- */
 namespace DMemory.Core;
 using MapCommands = Dictionary<string, string>;
 
@@ -153,9 +110,10 @@ public class ClientMetaData : IDisposable
 
   private void TrySendNext()
   {
-    if (_txQueue.TryPeek(out var data))
+//    if (_txQueue.TryPeek(out var data))
+    if (_txQueue.TryDequeue(out var data))
     {
-      _metadataSend = null;
+        _metadataSend = null;
       _processor.SerializeAndPrepare(data);
       // Дальше не ждём — реакция будет по событию!
     }
@@ -169,7 +127,7 @@ public class ClientMetaData : IDisposable
       return;
 
     _metadataSend.Add(MdCommand.State.AsKey(), _nameModule);
-    _metadataSend.Add(MdCommand.Data.AsKey(), "");
+    _metadataSend.Add(MdCommand.Data.AsKey(), "_");
     _transferWaiting = TransferWaiting.Waiting;
     // Получили "разрешение на запись" (по логике канала):
     _processor.CommitWrite();
@@ -187,7 +145,9 @@ public class ClientMetaData : IDisposable
     if (stateValue == _nameModule)
       return;
 
-    Console.WriteLine($"[Client] Получено от {stateValue}:");
+    map.Remove(MdCommand.State.AsKey());
+
+    Console.WriteLine($"[{_nameModule}] Получено от {stateValue}:");
 
     foreach (var kv in map)
       Console.WriteLine($" - {kv.Key} = {kv.Value}");
@@ -206,7 +166,7 @@ public class ClientMetaData : IDisposable
             _mode = SateMode.Work;
             _transferWaiting = TransferWaiting.Transfer;
             _timer.ResetInitialization();
-            Console.WriteLine(">>> Handshake подтверждён, переход в Work");
+            Console.WriteLine($">>> [{_nameModule}] Handshake подтверждён, переход в Work");
             return;
           }
           else if (cmdVal == "_")
@@ -217,7 +177,7 @@ public class ClientMetaData : IDisposable
               [MdCommand.State.AsKey()] = _nameModule,
               [MdCommand.Command.AsKey()] = MdCommand.Ok.AsKey()
             };
-            Console.WriteLine(">>> Client Отправили ok для завершения handhsake");
+            Console.WriteLine($">>> [{_nameModule}] Отправили ok для завершения handhsake");
             _mode = SateMode.Work;
             _timer.ResetInitialization();
             _transferWaiting = TransferWaiting.Transfer;
@@ -233,54 +193,132 @@ public class ClientMetaData : IDisposable
           [MdCommand.Command.AsKey()] = "_"
         };
         Md.WriteMetaMap(initAck);
-        Console.WriteLine(">>> Отправили пустой command  client -> server");
+        Console.WriteLine($">>> [{_nameModule}] Отправили пустой command  client -> server");
         break;
       }
-
       case SateMode.Work:
         {
           // Здесь будет основная логика работы: приём данных, реакции, управление
           // 👇 Пока ничего не шлём, ждём команды подтверждения
           //  Когда будут посылаться данные ставится TransferWaiting.Waiting !!
           // Здесь будет основная логика работы: приём данных, реакции, управление
-          Console.WriteLine(">>> Работаем: получили данные в режиме CLIENT Work");
+          Console.WriteLine($">>> [{_nameModule}]  Работаем: получили данные в режиме CLIENT Work");
           // 👇 Пока ничего не шлём, ждём команды подтверждения
 
           if (map.Count < 2) return;
           _timer.ResetWork();
           _timer.ResetWorkSendCount();
 
-          if (map.TryGetValue(MdCommand.Command.AsKey(), out var cmdVal))
+          bool _isSend = false;   //  признак передачи
+          MapCommands mapSend = new()
           {
-            if (cmdVal == MdCommand.Ok.AsKey())
+            [MdCommand.State.AsKey()] = _nameModule,
+          };
+          //  Обработка Command
+          if (map.ContainsKey(MdCommand.Command.AsKey()))
+          {
+            Console.WriteLine($">>> [{_nameModule}] map[Command] работаем в Work ");
+            //  Обработка Command
+            switch (map[MdCommand.Command.AsKey()])
             {
-              //              _mode = SateMode.Work;
-              _transferWaiting = TransferWaiting.Transfer; // подтверждение, что данные были приняты
-              Console.WriteLine(">>> [CLIENT]  Work подтверждение полученных данных ");
-              return;
+              case var key when key == MdCommand.DataOk.AsKey():
+              {
+                //  _mode = SateMode.Work; Это пришло подтверждение действий 
+                _transferWaiting = TransferWaiting.Transfer; // подтверждение, что данные были приняты
+                Console.WriteLine($">>> [{_nameModule}] map[Command] = Ok   ");
+                break;
+              }
+              case "_":
+              {
+                if(mapSend.TryAdd(MdCommand.Command.AsKey(), MdCommand.Ok.AsKey()))
+                  mapSend.Add(MdCommand.Command.AsKey(), MdCommand.Ok.AsKey());
+                Console.WriteLine($">>> [{_nameModule}] map[Command] = _   ");
+                _isSend = true;
+                break;
+              }
+              case var key when key == MdCommand.Error.AsKey():
+              {
+                Console.WriteLine($">>> [{_nameModule}] map[Command] = error   ");
+                break;
+              }
             }
+            map.Remove(MdCommand.Command.AsKey());
           }
-          else
+          //  Обработка Data
+          if (map.ContainsKey(MdCommand.Data.AsKey()))
           {
+            Console.WriteLine($">>> [{_nameModule}] map[Data]  ");
+
+            //  Обработка Data
+            var _data = map.TryGetValue(MdCommand.Data.AsKey(), out var dataVal) ? dataVal : "";
+            switch (_data)
+            {
+              case "_" :
+              { // получили данные и должны проверить 
+                Console.WriteLine($">>> [{_nameModule}] map[Data] = _  ");
+                _isSend = true;
+
+                  var sendReturn = _processor.ProcessMetaData(map);
+                if (string.IsNullOrEmpty(sendReturn))
+                {
+                  if (map.TryAdd(MdCommand.Data.AsKey(), MdCommand.Error.AsKey()))
+                    map.Add(MdCommand.Data.AsKey(), MdCommand.Error.AsKey());
+                }
+                else
+                {
+                  if (map.TryAdd(MdCommand.Data.AsKey(), sendReturn))
+                    map.Add(MdCommand.Data.AsKey(), sendReturn);
+                }
+                break;
+              }
+              case var key when key == MdCommand.DataOk.AsKey() && _transferWaiting == TransferWaiting.Waiting:   // MdCommand.DataOk.AsKey():
+              {
+                _transferWaiting = TransferWaiting.Transfer;
+                Console.WriteLine($">>> [{_nameModule}] map[Data] = DataOk  ");
+                TrySendNext();
+                break;
+              }
+              case var key when key == MdCommand.Error.AsKey():   // MdCommand.DataOk.AsKey():
+              {  // должны повторить посылку 
+                Console.WriteLine($">>> [{_nameModule}] map[Data] = Error  ");
+                _transferWaiting = TransferWaiting.Transfer;
+                  _processor.ResendData();
+                break;
+              }
+            }
+            map.Remove(MdCommand.Data.AsKey());
+          }
+
+          if (map.Any())
+          { // Если есть не обработанные ключи. 
+            Console.WriteLine($">>> [{_nameModule}] map еще ключи отладка  ");
+
             var searchTerms = new List<string> { MdCommand.State.AsKey(), "id" };
             var matchedKeys = map.Keys.ToList()
               .Where(key => searchTerms.Any(term => key.Contains(term, StringComparison.OrdinalIgnoreCase)))
               .ToList();
-            if (matchedKeys.Count == 0)
-              return;
+            if (matchedKeys.Count > 0)
+            {
+              //if()
+              foreach (var kv in matchedKeys)
+              {
+                Console.WriteLine($" - внешний уровень [{_nameModule}] !!!!  в SERVER  == >  {kv} = {map[kv]}");
+                map.Remove(kv);
+              }
 
-            //if()
-            foreach (var kv in matchedKeys)
-              Console.WriteLine($" - внешний уровень [client] !!!!  в SERVER  == >  {kv} = {map[kv]}");
-            //  обработка данных
-            map.Clear();
-            map.Add(MdCommand.State.AsKey(), _nameModule);
-            map.Add(MdCommand.Command.AsKey(), MdCommand.Ok.AsKey());
-            _transferWaiting = TransferWaiting.Transfer;
-            Md.WriteMetaMap(map);
+              if (mapSend.TryAdd(MdCommand.Command.AsKey(), MdCommand.Ok.AsKey()))
+                mapSend.Add(MdCommand.Command.AsKey(), MdCommand.Ok.AsKey());
+              _transferWaiting = TransferWaiting.Transfer;
+              _isSend = true;
+            }
+
+            //            Md.WriteMetaMap(map);
 
           }
 
+          // Проверяем, если _isSend=true отвечаем
+          if (_isSend)
+            Md.WriteMetaMap(map);
           break;
         }
       case SateMode.Dispose:
@@ -414,3 +452,95 @@ public class ClientMetaData : IDisposable
 //  // если канал свободен посылаем
 
 //}
+
+/*
+ 
+case SateMode.Work:
+   {
+       // Лог для входа в режим работы — можно убрать или оставить для отладки
+       Console.WriteLine(">>> Работаем: получили данные в режиме CLIENT Work");
+   
+       // Если метаданные почти пусты — скорее всего не нужно ничего делать
+       if (map == null || map.Count < 1)
+           break;
+   
+       // Сброс таймера активности (по твоему примеру)
+       _timer.ResetWork();
+       _timer.ResetWorkSendCount();
+   
+       // Получаем состояние от сервера (например, "servrCUDA")
+       map.TryGetValue(MdCommand.State.AsKey(), out var stateValue);
+   
+       // Обрабатываем команды подтверждений и данные
+   
+       // Обработка команды подтверждения MdCommand.Ok
+       if (map.TryGetValue(MdCommand.Ok.AsKey(), out var okValue))
+       {
+           if (!string.IsNullOrEmpty(okValue) && okValue.Equals("ok", StringComparison.OrdinalIgnoreCase))
+           {
+               Console.WriteLine(">>> [CLIENT] Получено подтверждение Ok от сервера");
+   
+               // Подтверждение, что предыдущий шаг принят
+               _transferWaiting = TransferWaiting.Transfer;
+   
+               // Возможно, нужно удалить или сместить очередь на следующий пакет
+               // Например:
+               _dataQueue.TryDequeue(out _);
+   
+               // Запускаем проверку/отправку следующих данных
+               TrySendNext();
+   
+               // Если есть дополнительные действия для Ok — сюда добавить
+           }
+       }
+   
+       // Обработка команды MdCommand.Data
+       if (map.TryGetValue(MdCommand.Data.AsKey(), out var dataValue))
+       {
+           if (string.Equals(dataValue, "dataok", StringComparison.OrdinalIgnoreCase))
+           {
+               Console.WriteLine(">>> [CLIENT] Получено подтверждение данных dataok");
+   
+               // Данные успешно получены сервером — можно смещать очередь и формировать следующий пакет
+               _dataQueue.TryDequeue(out _);
+   
+               TrySendNext();
+           }
+           else if (string.Equals(dataValue, "error", StringComparison.OrdinalIgnoreCase))
+           {
+               Console.WriteLine(">>> [CLIENT] Получена ошибка передачи данных — повторяем");
+   
+               // Повторяем отправку текущих данных (не удаляем из очереди!)
+               // Можно вызвать повторный вызов или установить флаг повтора
+               TrySendCurrentOrRetry();
+           }
+           else if (!string.IsNullOrEmpty(dataValue))
+           {
+               Console.WriteLine($">>> [CLIENT] Получены специальные данные: {dataValue}");
+   
+               // Если dataValue содержит другую информацию — возможно, нужно работать с памятью,
+               // обработать служебные команды.
+   
+               // Если есть команда Ok, обработать её совместно
+               if (okValue == null)
+               {
+                   // Если только data (без ok), всё равно стоит проверить очередь и отправить следующее
+                   TrySendNext();
+               }
+               // Для сложной логики с памятью сюда вписать дополнительные кейсы
+           }
+           else
+           {
+               // Если dataValue пустой — возможно, просто информативная команда
+               Console.WriteLine(">>> [CLIENT] Получены данные, но без специального действия");
+           }
+       }
+   
+       // Если ни Ok, ни Data не пришли — можно проверить другие команды, если необходимо
+   
+       // В конце можно следить за перезапуском таймеров или состояния
+       break;
+   }
+   
+
+ */
