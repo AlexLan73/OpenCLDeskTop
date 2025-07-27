@@ -1,4 +1,5 @@
 ﻿// See https://aka.ms/new-console-template for more information
+using Common.Core.Channel;
 using DMemory.Core;
 using DMemory.Enum;
 using DryIoc.ImTools;
@@ -11,8 +12,9 @@ using MapCommands = System.Collections.Generic.Dictionary<string, string>;
 Console.WriteLine(" Тестируем Протокол по MetaData  со стороны SERVER");
 MetaSettings mata = new("CUDA");
 int count = 0;
+var processor = new MemoryDataProcessor(mata.MemoryName, HandleReceivedData);
 
-var server = new ServerMetaData(mata);
+var server = new ServerMetaData(mata, processor);
 //var client = new ClientMetaData(mata);
 
 while (true)
@@ -30,8 +32,8 @@ while (true)
 
   Console.WriteLine($"Tick: {DateTime.Now:HH:mm:ss}  &  count {count}");
   Console.WriteLine($"STATE MODE");
-  Console.WriteLine($"[Server] -> {server._mode}   [ПЕРЕДАЧА] {server._transferWaiting} ");
-//  Console.WriteLine($"[Client] -> {client._mode}   {client._transferWaiting} ");
+  Console.WriteLine($"[Server] -> {server.GetSateMode()}   [ПЕРЕДАЧА] {server.GetSateMode()} ");
+  //  Console.WriteLine($"[Client] -> {client._mode}   {client._transferWaiting} ");
   /*
     if (client._mode == SateMode.Work && client._transferWaiting == TransferWaiting.Transfer) 
     {
@@ -45,15 +47,16 @@ while (true)
     }
   */
 
-  if (server._mode == SateMode.Work && server._transferWaiting == TransferWaiting.Transfer)
+  if (server.GetSateMode() == SateMode.Work && server.GeTransferWaiting() == TransferWaiting.Transfer)
   {
     var map1 = new MapCommands()
     {
       [MdCommand.State.AsKey()] = "serverCUDA",
       ["id_server"] = count.ToString(),
     };
-    server.WriteMetaMap(map1);   // пишем pong
-    server._transferWaiting = TransferWaiting.Waiting;
+    var ramDataTest01 = new RamData(null, null, map1);
+    await server.EnqueueToSendAsync(ramDataTest01);
+
   }
 
   Thread.Sleep(1000);
@@ -62,4 +65,13 @@ while (true)
 
 server.Dispose();
 
-await Task.WhenAll(server.WaiteEvent);
+Console.ReadLine();
+//await Task.WhenAll(server.WaiteEvent);
+
+void HandleReceivedData(RamData data)
+{
+  // Логика обработки данных сверху
+  Console.WriteLine($" [SERVER] Received data of type: {data.DataType.Name}");
+  // Например обработать данные, передать дальше и т.п.
+  //  Console.WriteLine($"Id: {example.Id}, Tik: {example.Values.Tik}, Value: {example.Values.Values:F2}");
+}

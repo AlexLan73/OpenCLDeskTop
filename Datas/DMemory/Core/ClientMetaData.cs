@@ -1,4 +1,6 @@
-﻿using Common.Event;
+﻿
+
+using Common.Event;
 using DMemory.Enum;
 using System;
 using System.Collections.Concurrent;
@@ -12,6 +14,22 @@ using Common.Core.Channel;
 namespace DMemory.Core;
 using MapCommands = Dictionary<string, string>;
 
+// Наследник для ClientMetaData
+public class ClientMetaData : BaseMetaData
+{
+  private readonly string _clientName;
+
+  public ClientMetaData(MetaSettings meta, MemoryDataProcessor processor)
+    : base(meta, processor, "client", "server",
+      meta.MetaEventServer, meta.MetaEventClient)
+  {
+    _clientName = "server" + meta.MemoryName;
+  }
+}
+
+
+
+/*
 public class ClientMetaData : IDisposable
 {
   private MapCommands? _metadataSend = null;
@@ -62,7 +80,7 @@ public class ClientMetaData : IDisposable
     // Старт фона (будет использоваться при добавлении таймов)
 
     SystemPulseTimer.On250MilSec += () =>
-    { /* действия каждые 0.25 сек */
+    { // действия каждые 0.25 сек //
       if (_mode == SateMode.Work)
       {
         _timer._timeWork = _timer.IncWork();
@@ -422,6 +440,8 @@ public class ClientMetaData : IDisposable
   }
 }
 
+*/
+/////////////////////////////////////////////////////////////////////////////////////
 /*
   private async Task ProcessQueueAsync(CancellationToken ct)
   {

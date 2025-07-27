@@ -13,8 +13,6 @@ using MapCommands = System.Collections.Generic.Dictionary<string, string>;
 Console.WriteLine(" Тестируем Протокол по MetaData  со стороны CLIENT");
 MetaSettings mata = new("CUDA");
 int count = 0;
-
-
 var processor = new MemoryDataProcessor(mata.MemoryName, HandleReceivedData);
 
 var client = new ClientMetaData(mata, processor);
@@ -33,12 +31,18 @@ while (true)
     }
   }
 
+/*
+     public TransferWaiting GeTransferWaiting() => _transferWaiting;
+   public SateMode GetSateMode() =>  _mode;
+
+ 
+ */
   Console.WriteLine($"Tick: {DateTime.Now:HH:mm:ss}  &  count {count}");
   Console.WriteLine($"STATE MODE");
-  Console.WriteLine($"[Server] -> {client._mode}   [ПЕРЕДАЧА] {client._transferWaiting} ");
-    Console.WriteLine($"[Client] -> {client._mode}   {client._transferWaiting} ");
+  Console.WriteLine($"[Server] -> {client.GetSateMode()}   [ПЕРЕДАЧА] {client.GeTransferWaiting()} ");
+    Console.WriteLine($"[Client] -> {client.GetSateMode()}   {client.GeTransferWaiting()} ");
   
-    if (client._mode == SateMode.Work && client._transferWaiting == TransferWaiting.Transfer)
+    if (client.GetSateMode() == SateMode.Work && client.GeTransferWaiting() == TransferWaiting.Transfer)
     {
 
 
@@ -47,17 +51,31 @@ while (true)
         [MdCommand.State.AsKey()] = "clientCUDA",
         ["id_client"] = count.ToString(),
       };
-      client.WriteMetaMap(map1);   // пишем pong
-      client._transferWaiting = TransferWaiting.Waiting;
+      var ramDataTest01 = new RamData(null, null, map1);
+      await client.EnqueueToSendAsync(ramDataTest01);
+//        .WriteMetaMap(map1);   // пишем pong
+//      client._transferWaiting = TransferWaiting.Waiting;
+
 
       if (_isSnd)
       {
         var x = CreateDtVariableChannel(count);
         var ramData = new RamData(x, typeof(DtVariableChannel), new MapCommands());
-        client.EnqueueToSend(ramData);
+ //       var ramData1 = new RamData(null, null, new MapCommands());
+        await client.EnqueueToSendAsync(ramData);
       }
 
     }
+/*
+ 
+   public void EnqueueToSend(RamData data)
+   {
+     _txQueue.Enqueue(data);
+     TrySendNext();
+   }
+
+
+ */
 
 
   Thread.Sleep(1000);
@@ -66,7 +84,7 @@ while (true)
 
 client.Dispose();
 
-await Task.WhenAll(client.WaiteEvent);
+//await Task.WhenAll(client.WaiteEvent);
 
 // Метод генерации одного экземпляра с заданным int id
 DtVariableChannel CreateDtVariableChannel(int id)
@@ -87,7 +105,7 @@ DtVariableChannel CreateDtVariableChannel(int id)
 void HandleReceivedData(RamData data)
 {
   // Логика обработки данных сверху
-  Console.WriteLine($"Received data of type: {data.DataType.Name}");
+  Console.WriteLine($"[CLIENT]  Received data of type: {data.DataType.Name}");
   // Например обработать данные, передать дальше и т.п.
 //  Console.WriteLine($"Id: {example.Id}, Tik: {example.Values.Tik}, Value: {example.Values.Values:F2}");
 }

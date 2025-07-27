@@ -65,7 +65,10 @@ namespace DMemory.Core {
       // Вызовем событие — метаданные готовы!
       MetaReady?.Invoke(this, meta);
     }
-
+    public void SendMetaCommand(MapCommands meta)
+    {
+      MetaReady?.Invoke(this, meta); // чисто команда/MD
+    }
     public void ResendData()
     {
       if (_pending != null) MetaReady?.Invoke(this, _pending.Value.Meta);
