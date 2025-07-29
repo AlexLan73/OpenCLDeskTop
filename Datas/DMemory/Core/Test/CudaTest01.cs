@@ -87,7 +87,7 @@ public class CudaTest01 : CudaMem01
 
 ////      using var memoryWrite = new MemoryBase("MyCUDA", TypeBlockMemory.Write);
 ////      using var memoryRead = new MemoryBase("MyCUDA", TypeBlockMemory.Read, callBackSetCommand);
-//      memoryWrite.SetCommandControl(yamlString);
+//      memoryWrite.WriteInMemoryMd(yamlString);
 
 //      //TestTaskDataControl();
 //      //Thread.Sleep(1000);

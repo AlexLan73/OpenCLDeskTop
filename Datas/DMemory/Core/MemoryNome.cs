@@ -1,7 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Globalization;
-
-namespace DMemory.Core;
+﻿namespace DMemory.Core;
 using MapCommands = Dictionary<string, string>;
 
 /// <summary>
@@ -15,6 +12,48 @@ using MapCommands = Dictionary<string, string>;
 ///   ....   все на оборот 
 /// </summary>
 
+/*
+ 
+public class MemoryNome : IDisposable
+   {
+   
+       /// Записать команду (словарь) в MD
+       public void CommandControlWrite(Dictionary<string, string> command)
+           => _memoryWrite.WriteInMemoryMd(command);
+   
+       /// Прочитать текущую запись из MD (control)
+       public Dictionary<string, string> ReadCommandControlWrite()
+           => _memoryWrite.ReadMemoryMd();
+   
+       /// Прочитать текущую запись из MD (read-канал)
+       public Dictionary<string, string> ReadCommandControlRead()
+           => _memoryRead.ReadMemoryMd();
+   
+       /// Очистить MD ("write"-канал)
+       public void ClearCommandControlWrite()
+           => _memoryWrite.ClearMemoryMd();
+   
+       /// Очистить MD ("read"-канал)
+       public void ClearCommandControlRead()
+           => _memoryRead.ClearMemoryMd();
+   
+       /// Проверить наличие конкретной команды
+       public bool TryGetCommand(string key, out string? value)
+       {
+           var map = ReadCommandControlWrite();
+           return map.TryGetValue(key, out value);
+       }
+   
+       public void Dispose()
+       {
+           _memoryRead?.Dispose();
+           _memoryWrite?.Dispose();
+       }
+   }
+   
+ 
+ */
+
 public class MemoryNome:IDisposable
 {
   public string NameMemory { get; }
@@ -25,44 +64,71 @@ public class MemoryNome:IDisposable
   private readonly Func<int, byte[]> _funcReadByteData;
   private readonly MemoryBase _memoryRead;
   private readonly MemoryBase _memoryWrite;
-
-
-  //  public MemoryNome(string nameMemory, ServerClient serverClient, Action<RecDataMetaData> callBackCommandControl)
+  private readonly List<string> commandHistory = new List<string>();
   public MemoryNome(string nameMemory, ServerClient serverClient)
   {
     NameMemory = nameMemory;
     ServerClient = serverClient;
-
     if (ServerClient == ServerClient.Server)
     {
-//      memoryRead = new MemoryBase(nameMemory + "Read", TypeBlockMemory.Read, callBackCommandControl);
       _memoryRead = new MemoryBase(nameMemory + "Read", TypeBlockMemory.Read);
-      _memoryRead.InitializationCallBack(CallbackCommandDatAction);
       _memoryWrite = new MemoryBase(nameMemory + "Write", TypeBlockMemory.Write);
-      //_setCommandControl = _memoryWrite.SetCommandControl;
-      //_actionWriteByteData = _memoryWrite.WriteByteData;
-      //_actionWriteByteDataM = _memoryWrite.WriteByteData;
-      //_funcReadByteData = _memoryRead.ReadMemoryData;
     }
     else
     {
       _memoryRead = new MemoryBase(nameMemory + "Write", TypeBlockMemory.Read);
-      _memoryRead.InitializationCallBack(CallbackCommandDatAction);
       _memoryWrite = new MemoryBase(nameMemory + "Read", TypeBlockMemory.Write);
-      //_setCommandControl = _memoryWrite.SetCommandControl;
-      //_actionWriteByteData = _memoryWrite.WriteByteData;
-      //_actionWriteByteDataM = _memoryWrite.WriteByteData;
-      //_funcReadByteData = _memoryRead.ReadMemoryData;
     }
-
-    _setCommandControl = _memoryWrite.SetCommandControl;
-    _actionWriteByteData = _memoryWrite.WriteByteData;
-    _actionWriteByteDataM = _memoryWrite.WriteByteData;
-    _funcReadByteData = _memoryRead.ReadMemoryData;
-
+  }
+  public void WriteCommand(string command)
+  {
+    commandHistory.Add(command);
+    // Дополнительно: реально записывать в память/буфер/файл
+  }
+  public string ReadLastCommand()
+  {
+    return commandHistory.Count > 0 ? commandHistory.Last() : null;
+  }
+  public IReadOnlyList<string> GetAllCommands()
+  {
+    return commandHistory.AsReadOnly();
   }
 
-  public void CommandControlWrite(MapCommands command) => _setCommandControl(command);
+  /// Записать команду (словарь) в MD
+  public void CommandControlWrite(Dictionary<string, string> command)
+    => _memoryWrite.SetCommandControl(command);
+
+  /// Прочитать текущую запись из MD (control)
+  public Dictionary<string, string> ReadCommandControlWrite()
+    => _memoryWrite.GetCommandControl();
+
+  /// Прочитать текущую запись из MD (read-канал)
+  public Dictionary<string, string> ReadCommandControlRead()
+    => _memoryRead.GetCommandControl();
+
+  /// Очистить MD ("write"-канал)
+  public void ClearCommandControlWrite()
+    => _memoryWrite.ClearCommandControl();
+
+  /// Очистить MD ("read"-канал)
+  public void ClearCommandControlRead()
+    => _memoryRead.ClearCommandControl();
+
+  /// Проверить наличие конкретной команды
+  public bool TryGetCommand(string key, out string? value)
+  {
+    var map = ReadCommandControlWrite();
+    return map.TryGetValue(key, out value);
+  }
+
+  public void Dispose()
+  {
+    _memoryRead?.Dispose();
+    _memoryWrite?.Dispose();
+  }
+
+
+//  public void CommandControlWrite(MapCommands command) => _setCommandControl(command);
   public byte[] ReadMemoryData(int count) => _funcReadByteData(count);
   public void WriteDataToMemory(byte[] bytes) => _actionWriteByteData(bytes);
   public void WriteDataToMemory(byte[] bytes, MapCommands map) => _actionWriteByteDataM(bytes, map);
@@ -73,19 +139,17 @@ public class MemoryNome:IDisposable
     return DateTime.ParseExact(dateString, format, CultureInfo.InvariantCulture);
   }
 
-  public virtual MapCommands ReadCommandControlWrite() => new MapCommands();
+//  public virtual MapCommands ReadCommandControlWrite() => new MapCommands();
 
   public virtual void CallbackCommandDatAction(RecDataMetaData dMetaData)
   {
 
   }
 
-
   private void ReleaseUnmanagedResources()
   {
     // TODO release unmanaged resources here
   }
-
   protected virtual void Dispose(bool disposing)
   {
     ReleaseUnmanagedResources();
@@ -96,15 +160,39 @@ public class MemoryNome:IDisposable
     _memoryWrite.Dispose();
   }
 
-  public void Dispose()
-  {
-    Dispose(true);
-    GC.SuppressFinalize(this);
-  }
-
-  ~MemoryNome()
-  {
-    Dispose(false);
-  }
 }
+
+//public MemoryNome(string nameMemory, ServerClient serverClient)
+//{
+//  NameMemory = nameMemory;
+//  ServerClient = serverClient;
+
+//  if (ServerClient == ServerClient.Server)
+//  {
+//    //      memoryRead = new MemoryBase(nameMemory + "Read", TypeBlockMemory.Read, callBackCommandControl);
+//    _memoryRead = new MemoryBase(nameMemory + "Read", TypeBlockMemory.Read);
+//    _memoryRead.InitializationCallBack(CallbackCommandDatAction);
+//    _memoryWrite = new MemoryBase(nameMemory + "Write", TypeBlockMemory.Write);
+//    //_setCommandControl = _memoryWrite.WriteInMemoryMd;
+//    //_actionWriteByteData = _memoryWrite.WriteByteData;
+//    //_actionWriteByteDataM = _memoryWrite.WriteByteData;
+//    //_funcReadByteData = _memoryRead.ReadMemoryData;
+//  }
+//  else
+//  {
+//    _memoryRead = new MemoryBase(nameMemory + "Write", TypeBlockMemory.Read);
+//    _memoryRead.InitializationCallBack(CallbackCommandDatAction);
+//    _memoryWrite = new MemoryBase(nameMemory + "Read", TypeBlockMemory.Write);
+//    //_setCommandControl = _memoryWrite.WriteInMemoryMd;
+//    //_actionWriteByteData = _memoryWrite.WriteByteData;
+//    //_actionWriteByteDataM = _memoryWrite.WriteByteData;
+//    //_funcReadByteData = _memoryRead.ReadMemoryData;
+//  }
+
+//  _setCommandControl = _memoryWrite.WriteInMemoryMd;
+//  _actionWriteByteData = _memoryWrite.WriteByteData;
+//  _actionWriteByteDataM = _memoryWrite.WriteByteData;
+//  _funcReadByteData = _memoryRead.ReadMemoryData;
+
+//}
 

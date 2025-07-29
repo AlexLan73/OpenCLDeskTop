@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-
-namespace DMemory.Core.Test;
+﻿namespace DMemory.Core.Test;
 
 public class CudaMem01(ServerClient serverClient) : MemoryNome("Cuda", serverClient)
 {

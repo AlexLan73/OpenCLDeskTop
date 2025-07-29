@@ -1,11 +1,9 @@
-﻿
-
-namespace DMemory.Core;
+﻿namespace DMemory.Core.Copy;
 
 using System.Threading;
 using MapCommands = Dictionary<string, string>;
 
-public class MemoryBase :IDisposable
+public class MemoryBaseNew :IDisposable
 {
   private string NameMemoryData { get;  }
   private string NameMemoryDataControl { get;  }
@@ -23,7 +21,7 @@ public class MemoryBase :IDisposable
   private readonly MemoryMappedFile _mmData; // Убираем '?' - теперь он будет всегда инициализирован
   private readonly long _dataSegmentSize; // Добавляем поле для хранения размера
 
-  public MemoryBase(string nameMemory, TypeBlockMemory typeBlockMemory, Action<RecDataMetaData> callBack=null,
+  public MemoryBaseNew(string nameMemory, TypeBlockMemory typeBlockMemory, Action<RecDataMetaData> callBack=null,
           long dataSegmentSize = MemStatic.SizeDataSegment)
   {
     NameMemoryData = nameMemory;
