@@ -1,8 +1,4 @@
-﻿using Common.Event;
-using DMemory.Enum;
-namespace DMemory.Core;
-
-using MapCommands = Dictionary<string, string>;
+﻿namespace DMemory.Core;
 
 public class ServerMetaData : BaseMetaData, IDisposable
 {

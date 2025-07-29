@@ -55,6 +55,10 @@ global using System.Windows;
 global using System.Windows.Controls;
 global using System.Windows.Threading;
 
+global using Common.Core.Channel;
+global using Common.Event;
+global using System.Collections.Concurrent;
+//global using MapCommands = System.Collections.Generic.Dictionary<string, string>;
 
 
 

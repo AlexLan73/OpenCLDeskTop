@@ -1,4 +1,4 @@
-﻿using DMemory.Enum;
+﻿using DMemory.Enums;
 
 namespace DMemory.Core;
 

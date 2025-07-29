@@ -1,18 +1,4 @@
-﻿
-
-using Common.Event;
-using DMemory.Enum;
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Common.Core.Channel;
-
-namespace DMemory.Core;
-using MapCommands = Dictionary<string, string>;
+﻿namespace DMemory.Core;
 
 // Наследник для ClientMetaData
 public class ClientMetaData : BaseMetaData

@@ -1,10 +1,10 @@
 ﻿// See https://aka.ms/new-console-template for more information
 using Common.Core.Channel;
 using DMemory.Core;
-using DMemory.Enum;
 using DryIoc.ImTools;
 using System.Reactive.Concurrency;
 using Windows.Media.Protection.PlayReady;
+using DMemory.Enums;
 using static Microsoft.IO.RecyclableMemoryStreamManager;
 using MapCommands = System.Collections.Generic.Dictionary<string, string>;
 
@@ -30,9 +30,9 @@ while (true)
     }
   }
 
-  Console.WriteLine($"Tick: {DateTime.Now:HH:mm:ss}  &  count {count}");
-  Console.WriteLine($"STATE MODE");
-  Console.WriteLine($"[Server] -> {server.GetSateMode()}   [ПЕРЕДАЧА] {server.GetSateMode()} ");
+//  Console.WriteLine($"Tick: {DateTime.Now:HH:mm:ss}  &  count {count}");
+//  Console.WriteLine($"STATE MODE");
+  Console.WriteLine($"[Server] -> {server.GetSateMode()}   [ПЕРЕДАЧА] {server.GeTransferWaiting()} ");
   //  Console.WriteLine($"[Client] -> {client._mode}   {client._transferWaiting} ");
   /*
     if (client._mode == SateMode.Work && client._transferWaiting == TransferWaiting.Transfer) 
@@ -49,14 +49,14 @@ while (true)
 
   if (server.GetSateMode() == SateMode.Work && server.GeTransferWaiting() == TransferWaiting.Transfer)
   {
-    var map1 = new MapCommands()
+/*    var map1 = new MapCommands()
     {
       [MdCommand.State.AsKey()] = "serverCUDA",
       ["id_server"] = count.ToString(),
     };
     var ramDataTest01 = new RamData(null, null, map1);
     await server.EnqueueToSendAsync(ramDataTest01);
-
+*/
   }
 
   Thread.Sleep(1000);
@@ -71,7 +71,7 @@ Console.ReadLine();
 void HandleReceivedData(RamData data)
 {
   // Логика обработки данных сверху
-  Console.WriteLine($" [SERVER] Received data of type: {data.DataType.Name}");
+  Console.WriteLine($" ************************ [SERVER] Received data of type: {data.DataType.Name}");
   // Например обработать данные, передать дальше и т.п.
   //  Console.WriteLine($"Id: {example.Id}, Tik: {example.Values.Tik}, Value: {example.Values.Values:F2}");
 }

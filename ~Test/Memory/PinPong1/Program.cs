@@ -1,9 +1,9 @@
 ﻿// See https://aka.ms/new-console-template for more information
 using DMemory.Core;
-using DMemory.Enum;
 using DryIoc.ImTools;
 using System.Reactive.Concurrency;
 using Windows.Media.Protection.PlayReady;
+using DMemory.Enums;
 using static Microsoft.IO.RecyclableMemoryStreamManager;
 using MapCommands = System.Collections.Generic.Dictionary<string, string>;
 

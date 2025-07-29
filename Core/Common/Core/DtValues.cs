@@ -5,6 +5,5 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace Common.Core;
-/*
-public record DtValues(ulong Tik, double Values);
-*/
+
+public record DataTimeValRec(ulong Tik, double Values);

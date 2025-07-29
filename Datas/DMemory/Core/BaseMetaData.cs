@@ -1,11 +1,9 @@
 ﻿using Common.Core.Channel;
 using Common.Event;
-using DMemory.Enum;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
+using Common.Core.Converter;
+using DMemory.Core.Converter;
+using DMemory.Enums;
 using MapCommands = System.Collections.Generic.Dictionary<string, string>;
 namespace DMemory.Core;
 
@@ -24,7 +22,7 @@ public abstract class BaseMetaData : IDisposable
   protected TransferWaiting _transferWaiting = TransferWaiting.None;
   protected SateMode _mode = SateMode.Initialization;
   protected readonly ServerMetaDataTimer _timer = new();
-
+  private readonly List<IBaseToChannelConverter> _baseToChannelConverters;
   protected BaseMetaData(
       MetaSettings meta, MemoryDataProcessor processor,
       string myPrefix, string peerPrefix, string sendEventName, string mdEventName)
@@ -36,12 +34,26 @@ public abstract class BaseMetaData : IDisposable
     SendEvent = new EventWaitHandle(false, EventResetMode.AutoReset, sendEventName);
     Md = new BasicMemoryMd(mdEventName, meta.MetaSize, meta.ControlName, CallBackMetaData, SendEvent);
     _processor.MetaReady += OnMetaReady;
-
-    // Таймеры инициализации — как в исходных файлах
-    SystemPulseTimer.On250MilSec += () => { if (_mode == SateMode.Work) _timer._timeWork = _timer.IncWork(); else _timer.ResetWork(); On250MilSec(); };
-    SystemPulseTimer.On1Second += () => { if (_mode == SateMode.Initialization) _timer._timeInitialization = _timer.IncInitialization(); else _timer.ResetInitialization(); On1Second(); };
+    _baseToChannelConverters = GetToChannelConverters;
+    //  Таймеры инициализации — как в исходных файлах
+    SystemPulseTimer.On250MilSec += () =>
+    {
+      if (_mode == SateMode.Work)
+        _timer._timeWork = _timer.IncWork();
+      else
+        _timer.ResetWork();
+      Comparison250MilSec();
+    };
+    SystemPulseTimer.On1Second += () =>
+    {
+      if (_mode == SateMode.Initialization)
+        _timer._timeInitialization = _timer.IncInitialization();
+      else _timer.ResetInitialization();
+      Comparison1SecTimer();
+    };
     SystemPulseTimer.On5Seconds += () => { _timer._timeGeneralWork = _timer.IncGeneralWork(); };
     SystemPulseTimer.Start();
+
 
     // "Рукопожатие" — отправка начального ack
     var initAck = new MapCommands { [MdCommand.State.AsKey()] = _nameModule };
@@ -49,27 +61,79 @@ public abstract class BaseMetaData : IDisposable
     _timer.ResetAll();
   }
 
+  private List<IBaseToChannelConverter> GetToChannelConverters =>
+  [
+    new DtVariableToChannelConverter(),
+    new VDtValuesToChannelConverter(),
+    new LoggerBaseToChannelConverter()
+  ];
+
   // Теперь поддерживаем возможность передачи только MD-команд (data/dataType == null)
+  /*  public async Task EnqueueToSendAsync(RamData data)
+    {
+      if (data.Data != null && data.DataType != null)
+      {
+        _txQueue.Enqueue(data);
+        await TrySendNextAsync();
+        return;
+      }
+
+      // MD-команда без данных! Ждем, пока канал не занят
+      await _sendSemaphore.WaitAsync();
+      try
+      {
+        _processor.SendMetaCommand(data.MetaData); // <<== будет вызвано событие MetaReady, обработается ниже
+      }
+      catch     //  стало
+
+      //    finally  было
+      {
+        _sendSemaphore.Release();
+      }
+    }
+  */
+
   public async Task EnqueueToSendAsync(RamData data)
   {
     if (data.Data != null && data.DataType != null)
     {
-      _txQueue.Enqueue(data);
+      object objToSerialize = data.Data;
+      Type typeToSerialize = data.DataType;
+
+      // Ищем обратный конвертер — если тип совпадает с SourceType базового типа
+      var forwardConverter = _baseToChannelConverters
+        .FirstOrDefault(conv => conv.SourceType == data.DataType);
+
+      if (forwardConverter != null)
+      {
+        objToSerialize = forwardConverter.Convert(data.Data);
+        typeToSerialize = forwardConverter.TargetType;
+      }
+
+      // Создаем новый RamData с преобразованными типом и объектом
+      var ramDataToSend = new RamData(objToSerialize, typeToSerialize, new MapCommands(data.MetaData));
+
+      // Передаём дальше — как обычно
+      _txQueue.Enqueue(ramDataToSend);
       await TrySendNextAsync();
       return;
     }
-
+    //if (data == null) throw new ArgumentNullException(nameof(data));
     // MD-команда без данных! Ждем, пока канал не занят
     await _sendSemaphore.WaitAsync();
     try
     {
       _processor.SendMetaCommand(data.MetaData); // <<== будет вызвано событие MetaReady, обработается ниже
     }
-    finally
+    catch     //  стало
+
+      //    finally  было
     {
       _sendSemaphore.Release();
     }
+
   }
+
 
   protected virtual async Task TrySendNextAsync()
   {
@@ -95,12 +159,13 @@ public abstract class BaseMetaData : IDisposable
     if (_mode != SateMode.Work || _transferWaiting != TransferWaiting.Transfer)
       return;
 
-    if (_metadataSend == null)
-      _metadataSend = new MapCommands();
+    _metadataSend =  new MapCommands(meta);
+//      _metadataSend[MdCommand.Data.AsKey()] = "_";  !!!!  нужно для чегото
+    if (_metadataSend.TryAdd(MdCommand.State.AsKey(), _nameModule))
+      _metadataSend[MdCommand.State.AsKey()] = _nameModule;
 
-    _metadataSend[MdCommand.State.AsKey()] = _nameModule;
-    _metadataSend[MdCommand.Data.AsKey()] = "_";
-    _transferWaiting = TransferWaiting.Waiting;
+    _transferWaiting = _metadataSend.Values.Contains("_")? TransferWaiting.Waiting: TransferWaiting.Transfer;
+//    _transferWaiting = TransferWaiting.Waiting;
     _processor.CommitWrite();
     Md.WriteMetaMap(_metadataSend);
   }
@@ -152,7 +217,7 @@ public abstract class BaseMetaData : IDisposable
 
   protected virtual void HandleWork(MapCommands map)
   {
-    if (map.Count < 2) return;
+    if (map.Count < 1) return;
 
     _timer.ResetWork();
     _timer.ResetWorkSendCount();
@@ -180,38 +245,84 @@ public abstract class BaseMetaData : IDisposable
     }
 
     // --- Data branch
-    if (map.TryGetValue(MdCommand.Data.AsKey(), out var dataVal))
+    if (map.TryGetValue(MdCommand.Data.AsKey(), out var dataVal) || map.TryGetValue(MdCommand.Control.AsKey(), out var controlVal))
     {
-      switch (dataVal)
+
+//      var dataMap = string.IsNullOrEmpty(dataVal)? (string.IsNullOrEmpty(controlVal)? null: controlVal) : dataVal;// !=null? dataVal: controlVal!=null? controlVal:;
+//      var dataMap = string.IsNullOrEmpty(dataVal)
+//        ? (string.IsNullOrEmpty(controlVal) ? null : controlVal): dataVal;
+
+      bool hasData = map.TryGetValue(MdCommand.Data.AsKey(), out dataVal);
+      bool hasControl = map.TryGetValue(MdCommand.Control.AsKey(), out controlVal);
+
+      if (hasData || hasControl)
       {
-        case "_": // получили данные, должны обработать
-          isSend = true;
-          var sendReturn = _processor.ProcessMetaData(map);
-          if (string.IsNullOrEmpty(sendReturn))
-            map[MdCommand.Data.AsKey()] = MdCommand.Error.AsKey();
-          else
-            map[MdCommand.Data.AsKey()] = sendReturn;
-          break;
-        case var dv when dv == MdCommand.DataOk.AsKey() && _transferWaiting == TransferWaiting.Waiting:
-          _transferWaiting = TransferWaiting.Transfer;
-          TrySendNextAsync().Wait(); // запустить следующий пакет
-          break;
-        case var dv when dv == MdCommand.Error.AsKey():
-          _transferWaiting = TransferWaiting.Transfer;
-          _processor.ResendData();
-          break;
+        var dataMap = !string.IsNullOrEmpty(dataVal)
+          ? dataVal
+          : (!string.IsNullOrEmpty(controlVal) ? controlVal : null);
+
+        switch (dataMap)
+        {
+          case "_": // получили данные, должны обработать
+          {
+            isSend = true;
+            var sendReturn = _processor.ProcessMetaData(map);
+            if (string.IsNullOrEmpty(sendReturn))
+            {
+              mapSend[MdCommand.Data.AsKey()] = MdCommand.Error.AsKey();
+            }
+            else
+            {
+              mapSend[MdCommand.Data.AsKey()] = sendReturn;
+            }
+
+            // _arrKey — массив ключей для удаления
+            string[] _arrKey = { MdCommand.Crc.AsKey(), MdCommand.Size.AsKey(), MdCommand.Type.AsKey() };
+            // Собираем ключи для удаления, которые есть в словаре
+            var keysToRemove = map.Keys.Intersect(_arrKey).ToList();
+            // Удаляем по списку
+            foreach (var key in keysToRemove)
+              map.Remove(key);
+            _transferWaiting = TransferWaiting.Transfer;
+
+            break;
+          }
+          case var dv when dv == MdCommand.DataOk.AsKey() && _transferWaiting == TransferWaiting.Waiting:
+          {
+            _transferWaiting = TransferWaiting.Transfer;
+            TrySendNextAsync().Wait(); // запустить следующий пакет
+            break;
+          }
+          case var dv when dv == MdCommand.Error.AsKey():
+          {
+            _transferWaiting = TransferWaiting.Transfer;
+            _processor.ResendData();
+            break;
+          }
+        }
       }
+
       map.Remove(MdCommand.Data.AsKey());
     }
 
+    if (map.TryGetValue(MdCommand.Control.AsKey(), out var controlValur))
+    {
+
+      
+      map.Remove(MdCommand.Control.AsKey());
+    }
     // --- Отладочные и лишние ключи
     if (map.Count > 0)
     {
       var keysToRemove = new List<string>();
       var searchTerms = new List<string> { MdCommand.State.AsKey(), "id" };
       foreach (var key in map.Keys)
+      {
+        Console.WriteLine($"Ключ: {key}, Значение: {map[key]}");
         if (searchTerms.Exists(term => key.Contains(term, StringComparison.OrdinalIgnoreCase)))
           keysToRemove.Add(key);
+
+      }
       foreach (var key in keysToRemove)
         map.Remove(key);
     }
@@ -224,15 +335,93 @@ public abstract class BaseMetaData : IDisposable
     }
   }
 
+
+  #region ===-- Comparison1SecTimer ---
+  private void Comparison250MilSec()
+  {
+    if (_mode == SateMode.Work && _timer.GetWork() > _timer._CompelWork)
+    {
+      _timer.ResetWork();
+      var initAck = new MapCommands
+      {
+        [MdCommand.State.AsKey()] = _nameModule,
+        [MdCommand.Command.AsKey()] = "_"
+      };
+      Md.WriteMetaMap(initAck);
+      _timer._workSendCount = _timer.IncWorkSendCount();
+    }
+  }
+  private void Comparison1SecTimer()
+  {
+
+    switch (_mode)
+    {
+      case SateMode.Work when _timer.GetInitialization() > _timer._CompeGeneralWork:
+        {
+          // время вышло связи нет переходим на начальный уровень
+          _mode = SateMode.Initialization;
+          _timer.ResetWork();
+          _timer.ResetInitialization();
+          _transferWaiting = TransferWaiting.None;
+
+          var initAck = new MapCommands
+          {
+            [MdCommand.State.AsKey()] = _nameModule,
+            [MdCommand.Command.AsKey()] = "_"
+          };
+          Md.WriteMetaMap(initAck);
+          return;
+        }
+      case SateMode.Initialization when (_timer.GetInitialization() % 5 == 1):
+        {
+          // время вышло связи нет переходим на начальный уровень
+          //      _mode = SateMode.Initialization;
+          _transferWaiting = TransferWaiting.None;
+
+          _timer.ResetWork();
+          //      ResetInitialization();
+          var initAck = new MapCommands
+          {
+            [MdCommand.State.AsKey()] = _nameModule,
+            [MdCommand.Command.AsKey()] = "_"
+          };
+          Md.WriteMetaMap(initAck);
+          return;
+        }
+      case SateMode.Work when _timer.GetWorkSendCount() > _timer._CompelWorkSendCount:
+        {
+          _mode = SateMode.Initialization;
+          _timer.ResetWork();
+          _timer.ResetInitialization();
+          _timer.ResetWorkSendCount();
+          var initAck = new MapCommands
+          {
+            [MdCommand.State.AsKey()] = _nameModule,
+            [MdCommand.Command.AsKey()] = "_"
+          };
+          Md.WriteMetaMap(initAck);
+          _timer._workSendCount = _timer.IncWorkSendCount();
+          break;
+        }
+      case SateMode.None:
+      case SateMode.Dispose:
+        break;
+      default:
+        return;
+        //throw new ArgumentOutOfRangeException();
+    }
+  }
+  #endregion
+
   public virtual void Dispose()
   {
     Md?.Dispose();
     SendEvent?.Dispose();
     _processor.MetaReady -= OnMetaReady;
   }
-
-  protected virtual void On250MilSec() { }
-  protected virtual void On1Second() { }
+  
+  //protected virtual void On250MilSec() { }
+  //protected virtual void On1Second() { }
 
   public TransferWaiting GeTransferWaiting() => _transferWaiting;
   public SateMode GetSateMode() => _mode;

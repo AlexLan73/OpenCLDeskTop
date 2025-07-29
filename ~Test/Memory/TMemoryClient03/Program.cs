@@ -7,7 +7,7 @@ using System.Data;
 using System.Diagnostics;
 using System.IO.MemoryMappedFiles;
 using System.Text;
-using DMemory.Enum;
+using DMemory.Enums;
 using MapCommands = System.Collections.Generic.Dictionary<string, string>;
 //Console.WriteLine("Тест протокола с С++");
 Console.WriteLine(" Test 003 Memory Client ");

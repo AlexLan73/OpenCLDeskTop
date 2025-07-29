@@ -1,8 +1,8 @@
-﻿namespace DMemory.Enum;
+﻿namespace DMemory.Enums;
 
 public enum MdCommand
 {
-  None, State, Command, Work, Ok, No, Error, Crc, DataOk, Data
+  None, State, Command, Work, Control, Ok, No, Error, Crc, DataOk, Data, Type, Size
 }
 
 public static class MdCommandExtensions
@@ -12,12 +12,15 @@ public static class MdCommandExtensions
     MdCommand.State => "state",
     MdCommand.Command => "command",
     MdCommand.Work => "work",
+    MdCommand.Control => "control",
     MdCommand.Ok => "ok",
     MdCommand.No => "no",
     MdCommand.Error => "error",
     MdCommand.Crc => "crc",
     MdCommand.DataOk => "dataok",
     MdCommand.Data => "data",
+    MdCommand.Type => "type",
+    MdCommand.Size => "size",
     _ => ""
   };
 }

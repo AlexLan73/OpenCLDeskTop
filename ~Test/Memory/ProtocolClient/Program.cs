@@ -1,12 +1,10 @@
 ﻿
 
 using DMemory.Core;
-using DMemory.Enum;
-using DryIoc.ImTools;
-using System.Reactive.Concurrency;
-using Windows.Media.Protection.PlayReady;
 using Common.Core.Channel;
 using DMemory.Core.Channel;
+using DMemory.Core.Test;
+using DMemory.Enums;
 using static Microsoft.IO.RecyclableMemoryStreamManager;
 using MapCommands = System.Collections.Generic.Dictionary<string, string>;
 
@@ -16,6 +14,7 @@ int count = 0;
 var processor = new MemoryDataProcessor(mata.MemoryName, HandleReceivedData);
 
 var client = new ClientMetaData(mata, processor);
+var _test = new TestDataFactory();
 
 bool _isSnd = true;
 while (true)
@@ -37,48 +36,69 @@ while (true)
 
  
  */
-  Console.WriteLine($"Tick: {DateTime.Now:HH:mm:ss}  &  count {count}");
-  Console.WriteLine($"STATE MODE");
-  Console.WriteLine($"[Server] -> {client.GetSateMode()}   [ПЕРЕДАЧА] {client.GeTransferWaiting()} ");
-    Console.WriteLine($"[Client] -> {client.GetSateMode()}   {client.GeTransferWaiting()} ");
-  
-    if (client.GetSateMode() == SateMode.Work && client.GeTransferWaiting() == TransferWaiting.Transfer)
+//  Console.WriteLine($"Tick: {DateTime.Now:HH:mm:ss}  &  count {count}");
+//  Console.WriteLine($"STATE MODE");
+  Console.WriteLine($"[Client] -> {client.GetSateMode()}   [ПЕРЕДАЧА] {client.GeTransferWaiting()} ");
+//    Console.WriteLine($"[Client] -> {client.GetSateMode()}   {client.GeTransferWaiting()} ");
+
+  if (client.GetSateMode() == SateMode.Work && client.GeTransferWaiting() == TransferWaiting.Transfer)
+  {
+
+
+    //var map1 = new MapCommands()
+    //  {
+    //    [MdCommand.State.AsKey()] = "clientCUDA",
+    //    ["id_client"] = count.ToString(),
+    //  };
+    //  var ramDataTest01 = new RamData(null, null, map1);
+    //  await client.EnqueueToSendAsync(ramDataTest01);
+
+    /*
+          if (_isSnd && count%5==4)
+          {
+                  //_isSnd = false;
+          Console.WriteLine($" [Client] ->    Tick: {DateTime.Now:HH:mm:ss}  &  count {count}");
+            var x = CreateDtVariableChannel(count);
+            var ramData = new RamData(x, typeof(DtVariableChannel), new MapCommands());
+     //       var ramData1 = new RamData(null, null, new MapCommands());
+            await client.EnqueueToSendAsync(ramData);
+
+          }
+    */
+
+    if (_isSnd)
     {
-
-
-    var map1 = new MapCommands()
+      int ind = count % 4;
+      RamData ramData = null;
+      switch (ind)
       {
-        [MdCommand.State.AsKey()] = "clientCUDA",
-        ["id_client"] = count.ToString(),
-      };
-      var ramDataTest01 = new RamData(null, null, map1);
-      await client.EnqueueToSendAsync(ramDataTest01);
-//        .WriteMetaMap(map1);   // пишем pong
-//      client._transferWaiting = TransferWaiting.Waiting;
+        case 1:
+        {
+          var x = _test.CreateDtVariable(count);
+          ramData = new RamData(x, typeof(IdDataTimeVal), new MapCommands());
+          break;
+        }
+        case 2:
+        {
+          var x = _test.CreateVDtValues(count, 10);
+          ramData = new RamData(x, typeof(VIdDataTimeVal), new MapCommands());
+          break;
+        }
+        case 3:
+        {
+          var x = _test.CreateLoggerBase(count);
+          ramData = new RamData(x, typeof(LoggerBase), new MapCommands());
+          break;
+        }
 
-
-      if (_isSnd)
-      {
-        var x = CreateDtVariableChannel(count);
-        var ramData = new RamData(x, typeof(DtVariableChannel), new MapCommands());
- //       var ramData1 = new RamData(null, null, new MapCommands());
-        await client.EnqueueToSendAsync(ramData);
       }
+      if(ramData != null) 
+        await client.EnqueueToSendAsync(ramData);
 
     }
-/*
- 
-   public void EnqueueToSend(RamData data)
-   {
-     _txQueue.Enqueue(data);
-     TrySendNext();
-   }
+  }
 
-
- */
-
-
-  Thread.Sleep(1000);
+  Thread.Sleep(50);
   count++;
 }
 

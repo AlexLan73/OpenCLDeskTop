@@ -1,5 +1,5 @@
 ﻿using Common.Event;
-using DMemory.Enum;
+using DMemory.Enums;
 
 
 namespace DMemory.Core;
