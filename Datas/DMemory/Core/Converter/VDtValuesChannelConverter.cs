@@ -13,6 +13,25 @@ namespace DMemory.Core.Converter;
 public class VDtValuesChannelConverter : IChannelConverter
 {
   public Type SourceType => typeof(VDtValuesChannel);
+  public Type TargetType => typeof(DataTimeVariableV);
+
+  public object Convert(object channelObject)
+  {
+    var src = channelObject as VDtValuesChannel;
+    if (src == null)
+      throw new ArgumentNullException(nameof(channelObject), "Expected VDtValuesChannel");
+
+    // Конвертация массива DtValues[] -> DataTimeValRec[]
+    DataTimeVariable[] variables = src.Values?.Select(v => new DataTimeVariable(v.Tik, v.Values)).ToArray() ?? [];
+
+    return new DataTimeVariableV(variables);
+  }
+}
+
+/*
+public class VDtValuesChannelConverter : IChannelConverter
+{
+  public Type SourceType => typeof(VDtValuesChannel);
   public Type TargetType => typeof(VIdDataTimeVal);
 
   public object Convert(object channelObject)
@@ -27,7 +46,7 @@ public class VDtValuesChannelConverter : IChannelConverter
     return new VIdDataTimeVal(src.Id, variables);
   }
 }
-
+*/
 public class VDtValuesToChannelConverter : IBaseToChannelConverter
 {
   public Type SourceType => typeof(VIdDataTimeVal);

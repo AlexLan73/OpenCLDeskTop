@@ -35,6 +35,49 @@ var ramData = new RamData(deserializedObj, dataType, new MapCommands(metaData));
 когда это отладим следующий шаг наши структуры будут записывать данные в контейнер или контейнеры для дальнейшей математической обработки и построение графиков
 в дальнейшем у нас будут контейнеры и передача данный через ReactivUI
 Это примерная структура/ все понятно? Есть вопросы? Предлагай замечания. Ты же у меня УМНИЦА)))
+-----------------
+Эхо!! Все правильно! сейчас начнем (или завтра, вечером попробуем графики рисовать)) делать основные классы 
+но хочу обратить твое внимание мы должны закончить конвертацию в классы ChannelBase.cs в DMemory.dll
+То есть 
+ DATA.dll
+  ├─ CUDA -> вызывает  DMemory передает/читает данные. когда она их читает из DMemory они уже сконвертированны и записывает в соответствующий SourceList<T>.
+SourceList<T> - возникают ТОЛЬКО в DATA.dll
+модуль DMemory должен быть функционально законченный
+Понятно?
+Эхо, давай с тобой реализуем в DATA.dll
+ логику взаимодействия каждого модулей CUDA, clFFT, Statistic и прочее
+Значит должен быть менеджер который будет создавать данные модули по название выделяемой памяти.
+внутри модуля нужно организовать буферизацию данных от DMemory в SourceList<T> это один поток. 
+Другой поток будет считывать данные по id из  SourceList<T> и записывать в SourceCache по id. Сколько id столько и SourceCache.
+Здесь id определяется от работающих задач на с++ и от передаваемой информации. каждый блок данных имеет свой id. Важно id уникален внутри одного модуля CUDA, clFFT, Statistic и прочее. На приемной стороне каждый модуль CUDA, clFFT, Statistic и прочее будет связан со своими расчетами и отображением информации.
+Резюме в DATA.dll нужно создать DataContext через который будет происходить манагер модулей передача/прием данных в  DMemory, и передаче/прием данный из всех остальных частей программы
+ 
+/////////////////////////////////////////////////////
+IDataModule : IDisposable
+{
+    string Name { get; }
+    void AddData(RamData data);   // Входящие данные из DMemory (конвертированные)
+добавить void SendData(RamData data);   // Данные в DMemory (не конвертированные)
+
+не понятно с  protected virtual async Task ProcessingLoop(CancellationToken ct)
+отработали using var subscription = bufferStream.Subscribe(changes =>
+        { foreach (var change in changes)
+            {  if (change.Reason == ListChangeReason.Add) {  DistributeItem(change.Item.Current); }  }
+        });
+и попали в  цикл 	
+while (!ct.IsCancellationRequested) {  await Task.Delay(100, ct); // или более подходящая логика ожидания/события            }
+а по событию нельзя было сделать? типа пришел сброс и вышли)))
+опиши эту protected void DistributeItem(TBuffer item)
+в public class DataContext : IDisposable
+// Метод вызывается из DMemory.dll с конвертированными объектами и именем памяти (например, "CUDA")
+    public void OnReceiveData(string moduleName, RamData data)
+неправильно он должен вызываться внутри new CUDAModule() и так далее 
+
+
+ 
+
+
+
 
 
 

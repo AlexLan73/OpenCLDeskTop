@@ -11,6 +11,19 @@ namespace DMemory.Core.Converter;
 public class DtVariableChannelConverter : IChannelConverter
 {
   public Type SourceType => typeof(DtVariableChannel);
+  public Type TargetType => typeof(DataTimeVariable);
+
+  public object Convert(object channelObject)
+  {
+    var src = channelObject as DtVariableChannel;
+    return new DataTimeVariable(src.Values.Tik, src.Values.Values);
+  }
+}
+
+/*
+public class DtVariableChannelConverter : IChannelConverter
+{
+  public Type SourceType => typeof(DtVariableChannel);
   public Type TargetType => typeof(Common.Core.Channel.IdDataTimeVal);
 
   public object Convert(object channelObject)
@@ -19,7 +32,7 @@ public class DtVariableChannelConverter : IChannelConverter
     return new Common.Core.Channel.IdDataTimeVal(src.Id, new DataTimeValRec(src.Values.Tik, src.Values.Values));
   }
 }
-
+*/
 
 public class DtVariableToChannelConverter : IBaseToChannelConverter
 {
@@ -37,5 +50,4 @@ public class DtVariableToChannelConverter : IBaseToChannelConverter
   }
 }
 
-//var src = baseObj as VIdDataTimeVal;
-//var arr = src.Variables.Select(v => new DtValues(v.Tik, v.Values)).ToArray();
+

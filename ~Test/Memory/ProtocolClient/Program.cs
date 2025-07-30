@@ -98,7 +98,7 @@ while (true)
     }
   }
 
-  Thread.Sleep(50);
+  Thread.Sleep(100);
   count++;
 }
 
