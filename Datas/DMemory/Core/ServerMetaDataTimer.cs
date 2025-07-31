@@ -12,7 +12,7 @@ public class ServerMetaDataTimer
   public int _timeInitialization = 0;
   public int _workSendCount = 0;
 
-  public int _CompeGeneralWork { get; private set; } = 1 * 12 * 5;
+  public int _CompeGeneralWork { get; private set; } = 4; // 60 сек  => 1 * 12 * 5
   public int _CompelWork { get; private set; } = 6;
   public int _CompeInitialization { get; private set; } = 6;
   public int _CompelWorkSendCount { get; private set; } = 5;

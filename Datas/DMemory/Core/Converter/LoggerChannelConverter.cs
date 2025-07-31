@@ -19,7 +19,7 @@ public class LoggerChannelConverter : IChannelConverter
     if (src == null)
       throw new ArgumentNullException(nameof(channelObject), "Expected LoggerChannel");
 
-    return new LoggerBase(src.Id, src.Module, src.Log, src.Code);
+    return new LoggerBase(src.Tik, src.Id, src.Module, src.Log, src.Code);
   }
 }
 // LoggerBase -> LoggerChannel
@@ -28,9 +28,15 @@ public class LoggerBaseToChannelConverter : IBaseToChannelConverter
   public Type SourceType => typeof(LoggerBase);
   public Type TargetType => typeof(LoggerChannel);
 
+  /*
   public object Convert(object baseObj)
   {
-    var src = baseObj as LoggerBase;
-    return new LoggerChannel(src.Id, src.Module, src.Log, src.Code);
+    if (baseObj is LoggerBase src) return new LoggerChannel(src.Tik, src.Id, src.Module, src.Log, src.Code);
+    else return null;
   }
+*/
+  public object Convert(object baseObj)=> (baseObj is LoggerBase src) 
+                                               ? new LoggerChannel(src.Tik, src.Id, src.Module, src.Log, src.Code)
+                                               :null;
+
 }

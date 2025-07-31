@@ -8,6 +8,7 @@
       <ResourceDictionary.MergedDictionaries>
         <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Controls.xaml" />
         <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Fonts.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Colors.xaml" />
         <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Themes/Dark.Blue.xaml" />
 
         <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/controls.checkbox.xaml" />
@@ -18,3 +19,9 @@
 
   </Application.Resources>
 </prism:PrismApplication>
+
+    
+<!--
+        <ResourceDictionary Source="pack://application:,,,/MahApps.Metro;component/Styles/Accents/Accent4.xaml" />
+    
+    -->    

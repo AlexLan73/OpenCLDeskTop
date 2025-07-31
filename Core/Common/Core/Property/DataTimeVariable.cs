@@ -1,17 +1,18 @@
 ﻿namespace Common.Core.Property;
 
+public record DataTimeValRec(long Tik, double Values);
 public interface IDataTimeVariable
 {
-  ulong Tik { get; set; }
+  long Tik { get; set; }
   double Variable { get; set; }
 }
 
 public class DataTimeVariable //: IDataTimeTik
 {
-  public ulong Tik { get; set; } = 0;
+  public long Tik { get; set; } = 0;
   public double Variable { get; set; } = 0d;
 
-  public DataTimeVariable(ulong tik, double variable)
+  public DataTimeVariable(long tik, double variable)
   {
     Tik = tik;
     Variable = variable;

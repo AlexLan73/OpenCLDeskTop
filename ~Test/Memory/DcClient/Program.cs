@@ -1,4 +1,5 @@
-﻿
+﻿// See https://aka.ms/new-console-template for more information
+
 
 using DMemory.Core;
 using Common.Core.Channel;
@@ -30,16 +31,16 @@ while (true)
     }
   }
 
-/*
-     public TransferWaiting GeTransferWaiting() => _transferWaiting;
-   public SateMode GetSateMode() =>  _mode;
+  /*
+       public TransferWaiting GeTransferWaiting() => _transferWaiting;
+     public SateMode GetSateMode() =>  _mode;
 
- 
- */
-//  Console.WriteLine($"Tick: {DateTime.Now:HH:mm:ss}  &  count {count}");
-//  Console.WriteLine($"STATE MODE");
-  Console.WriteLine($"[Client] -> {client.GetSateMode()}   [ПЕРЕДАЧА] {client.GeTransferWaiting()}  count={count}");
-//    Console.WriteLine($"[Client] -> {client.GetSateMode()}   {client.GeTransferWaiting()} ");
+
+   */
+  //  Console.WriteLine($"Tick: {DateTime.Now:HH:mm:ss}  &  count {count}");
+  //  Console.WriteLine($"STATE MODE");
+  Console.WriteLine($"[Client] -> {client.GetSateMode()}   [ПЕРЕДАЧА] {client.GeTransferWaiting()} ");
+  //    Console.WriteLine($"[Client] -> {client.GetSateMode()}   {client.GeTransferWaiting()} ");
 
   if (client.GetSateMode() == SateMode.Work && client.GeTransferWaiting() == TransferWaiting.Transfer)
   {
@@ -73,26 +74,26 @@ while (true)
       switch (ind)
       {
         case 1:
-        {
-          var x = _test.CreateDtVariable(count);
-          ramData = new RamData(x, typeof(IdDataTimeVal), new MapCommands());
-          break;
-        }
+          {
+            var x = _test.CreateDtVariable(count);
+            ramData = new RamData(x, typeof(IdDataTimeVal), new MapCommands());
+            break;
+          }
         case 2:
-        {
-          var x = _test.CreateVDtValues(count, 10);
-          ramData = new RamData(x, typeof(VIdDataTimeVal), new MapCommands());
-          break;
-        }
+          {
+            var x = _test.CreateVDtValues(count, 10);
+            ramData = new RamData(x, typeof(VIdDataTimeVal), new MapCommands());
+            break;
+          }
         case 3:
-        {
-          var x = _test.CreateLoggerBase(count);
-          ramData = new RamData(x, typeof(LoggerBase), new MapCommands());
-          break;
-        }
+          {
+            var x = _test.CreateLoggerBase(count);
+            ramData = new RamData(x, typeof(LoggerBase), new MapCommands());
+            break;
+          }
 
       }
-      if(ramData != null) 
+      if (ramData != null)
         await client.EnqueueToSendAsync(ramData);
 
     }
@@ -113,7 +114,7 @@ DtVariableChannel CreateDtVariableChannel(int id)
 
   uint convertedId = unchecked((uint)id); // Преобразуем int в uint (если id всегда положительное — можно просто к uint)
 
-  long tik = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(); // Можно использовать тики времени в миллисекундах
+  long tik = (long)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(); // Можно использовать тики времени в миллисекундах
 
   double value = rnd.NextDouble() * (100 - 30) + 30; // случайное double от 30 до 100
 
@@ -127,5 +128,5 @@ void HandleReceivedData(RamData data)
   // Логика обработки данных сверху
   Console.WriteLine($"[CLIENT]  Received data of type: {data.DataType.Name}");
   // Например обработать данные, передать дальше и т.п.
-//  Console.WriteLine($"Id: {example.Id}, Tik: {example.Values.Tik}, Value: {example.Values.Values:F2}");
+  //  Console.WriteLine($"Id: {example.Id}, Tik: {example.Values.Tik}, Value: {example.Values.Values:F2}");
 }

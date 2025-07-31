@@ -105,77 +105,19 @@ namespace DMemory.Core {
 
       return mapping;
     }
-
-    public string ProcessMetaData(MapCommands metaData)
-    {
-      if (metaData == null)
-        return null;
-
-      if (!metaData.TryGetValue(MdCommand.Size.AsKey(), out var sizeStr) || !int.TryParse(sizeStr, out var size) || size <= 0 || size > _memorySize)
-        return null;
-
-      if (!metaData.TryGetValue(MdCommand.Crc.AsKey(), out var crcExpected))
-        return null;
-
-      if (!metaData.TryGetValue(MdCommand.Type.AsKey(), out var typeKey))
-        return null;
-
-      if (!_typeMapping.TryGetValue(typeKey, out var dataType))
-        return null;
-
-      try
-      {
-        var buffer = new byte[size];
-        _accessor.ReadArray(0, buffer, 0, size);
-
-        var crcActual = Crc32Helper.Compute(buffer);
-        if (!string.Equals(crcActual, crcExpected, StringComparison.OrdinalIgnoreCase))
-          return MdCommand.Error.AsKey();
-
-        var deserializedObj = MessagePackSerializer.Deserialize(dataType, buffer);
-        if (deserializedObj == null)
-          return MdCommand.Error.AsKey();
-
-        // Здесь вызываем конвертер, если он есть для типа dataType
-        var convertedObj = deserializedObj;
-        var convertedType = dataType;
-
-        // Поиск конвертера по типу исходного объекта
-        var converter = _converters.FirstOrDefault(c => c.SourceType == dataType);
-        if (converter != null)
-        {
-          convertedObj = converter.Convert(deserializedObj);
-          convertedType = converter.TargetType;
-        }
-
-        var ramData = new RamData(convertedObj, convertedType, new MapCommands(metaData));
-
-        // Вызов события с готовыми и конвертированными данными — уведомляем "верх"
-        _onDataReceived?.Invoke(ramData);
-
-        return MdCommand.DataOk.AsKey();
-      }
-      catch (Exception ex)
-      {
-        Console.WriteLine($"[MemoryDataProcessor] Ошибка десериализации: {ex.Message}");
-        return null;
-      }
-    }
-
-
     /*
         public string ProcessMetaData(MapCommands metaData)
         {
           if (metaData == null)
             return null;
 
-          if (!metaData.TryGetValue("size", out var sizeStr) || !int.TryParse(sizeStr, out var size) || size <= 0 || size > _memorySize)
+          if (!metaData.TryGetValue(MdCommand.Size.AsKey(), out var sizeStr) || !int.TryParse(sizeStr, out var size) || size <= 0 || size > _memorySize)
             return null;
 
-          if (!metaData.TryGetValue("crc", out var crcExpected))
+          if (!metaData.TryGetValue(MdCommand.Crc.AsKey(), out var crcExpected))
             return null;
 
-          if (!metaData.TryGetValue("type", out var typeKey))
+          if (!metaData.TryGetValue(MdCommand.Type.AsKey(), out var typeKey))
             return null;
 
           if (!_typeMapping.TryGetValue(typeKey, out var dataType))
@@ -194,19 +136,77 @@ namespace DMemory.Core {
             if (deserializedObj == null)
               return MdCommand.Error.AsKey();
 
-            var ramData = new RamData(deserializedObj, dataType, new MapCommands(metaData));
+            // Здесь вызываем конвертер, если он есть для типа dataType
+            var convertedObj = deserializedObj;
+            var convertedType = dataType;
 
-            // Вызов события с готовыми данными — уведомляем "верх"
+            // Поиск конвертера по типу исходного объекта
+            var converter = _converters.FirstOrDefault(c => c.SourceType == dataType);
+            if (converter != null)
+            {
+              convertedObj = converter.Convert(deserializedObj);
+              convertedType = converter.TargetType;
+            }
+
+            var ramData = new RamData(convertedObj, convertedType, new MapCommands(metaData));
+
+            // Вызов события с готовыми и конвертированными данными — уведомляем "верх"
             _onDataReceived?.Invoke(ramData);
-            return MdCommand.DataOk.AsKey(); 
+
+            return MdCommand.DataOk.AsKey();
           }
           catch (Exception ex)
           {
             Console.WriteLine($"[MemoryDataProcessor] Ошибка десериализации: {ex.Message}");
-            return null ;
+            return null;
           }
         }
     */
+
+
+    public string ProcessMetaData(MapCommands metaData)
+    {
+      if (metaData == null)
+        return null;
+
+      if (!metaData.TryGetValue("size", out var sizeStr) || !int.TryParse(sizeStr, out var size) || size <= 0 || size > _memorySize)
+        return null;
+
+      if (!metaData.TryGetValue("crc", out var crcExpected))
+        return null;
+
+      if (!metaData.TryGetValue("type", out var typeKey))
+        return null;
+
+      if (!_typeMapping.TryGetValue(typeKey, out var dataType))
+        return null;
+
+      try
+      {
+        var buffer = new byte[size];
+        _accessor.ReadArray(0, buffer, 0, size);
+
+        var crcActual = Crc32Helper.Compute(buffer);
+//        if (!string.Equals(crcActual, crcExpected, StringComparison.OrdinalIgnoreCase))
+//          return MdCommand.Error.AsKey();
+
+        var deserializedObj = MessagePackSerializer.Deserialize(dataType, buffer);
+        if (deserializedObj == null)
+          return MdCommand.Error.AsKey();
+
+        var ramData = new RamData(deserializedObj, dataType, new MapCommands(metaData));
+
+        // Вызов события с готовыми данными — уведомляем "верх"
+        _onDataReceived?.Invoke(ramData);
+        return MdCommand.DataOk.AsKey();
+      }
+      catch (Exception ex)
+      {
+        Console.WriteLine($"[MemoryDataProcessor] Ошибка десериализации: {ex.Message}");
+        return null;
+      }
+    }
+
     public void Dispose()
     {
       _accessor?.Dispose();

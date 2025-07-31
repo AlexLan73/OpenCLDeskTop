@@ -69,56 +69,16 @@ public abstract class BaseMetaData : IDisposable
   ];
 
   // Теперь поддерживаем возможность передачи только MD-команд (data/dataType == null)
-  /*  public async Task EnqueueToSendAsync(RamData data)
-    {
-      if (data.Data != null && data.DataType != null)
-      {
-        _txQueue.Enqueue(data);
-        await TrySendNextAsync();
-        return;
-      }
-
-      // MD-команда без данных! Ждем, пока канал не занят
-      await _sendSemaphore.WaitAsync();
-      try
-      {
-        _processor.SendMetaCommand(data.MetaData); // <<== будет вызвано событие MetaReady, обработается ниже
-      }
-      catch     //  стало
-
-      //    finally  было
-      {
-        _sendSemaphore.Release();
-      }
-    }
-  */
-
+  /*
   public async Task EnqueueToSendAsync(RamData data)
   {
     if (data.Data != null && data.DataType != null)
     {
-      object objToSerialize = data.Data;
-      Type typeToSerialize = data.DataType;
-
-      // Ищем обратный конвертер — если тип совпадает с SourceType базового типа
-      var forwardConverter = _baseToChannelConverters
-        .FirstOrDefault(conv => conv.SourceType == data.DataType);
-
-      if (forwardConverter != null)
-      {
-        objToSerialize = forwardConverter.Convert(data.Data);
-        typeToSerialize = forwardConverter.TargetType;
-      }
-
-      // Создаем новый RamData с преобразованными типом и объектом
-      var ramDataToSend = new RamData(objToSerialize, typeToSerialize, new MapCommands(data.MetaData));
-
-      // Передаём дальше — как обычно
-      _txQueue.Enqueue(ramDataToSend);
+      _txQueue.Enqueue(data);
       await TrySendNextAsync();
       return;
     }
-    //if (data == null) throw new ArgumentNullException(nameof(data));
+
     // MD-команда без данных! Ждем, пока канал не занят
     await _sendSemaphore.WaitAsync();
     try
@@ -127,13 +87,56 @@ public abstract class BaseMetaData : IDisposable
     }
     catch     //  стало
 
-      //    finally  было
+    //    finally  было
     {
       _sendSemaphore.Release();
     }
-
   }
+  */
 
+  
+    public async Task EnqueueToSendAsync(RamData data)
+    {
+      if (data.Data != null && data.DataType != null)
+      {
+
+        object objToSerialize = data.Data;
+        Type typeToSerialize = data.DataType;
+
+        // Ищем обратный конвертер — если тип совпадает с SourceType базового типа
+        var forwardConverter = _baseToChannelConverters
+          .FirstOrDefault(conv => conv.SourceType == data.DataType);
+
+        if (forwardConverter != null)
+        {
+          objToSerialize = forwardConverter.Convert(data.Data);
+          typeToSerialize = forwardConverter.TargetType;
+        }
+
+        // Создаем новый RamData с преобразованными типом и объектом
+        var ramDataToSend = new RamData(objToSerialize, typeToSerialize, new MapCommands(data.MetaData));
+
+        // Передаём дальше — как обычно
+        _txQueue.Enqueue(ramDataToSend);
+        await TrySendNextAsync();
+        return;
+      }
+      //if (data == null) throw new ArgumentNullException(nameof(data));
+      // MD-команда без данных! Ждем, пока канал не занят
+      await _sendSemaphore.WaitAsync();
+      try
+      {
+        _processor.SendMetaCommand(data.MetaData); // <<== будет вызвано событие MetaReady, обработается ниже
+      }
+      catch     //  стало
+
+        //    finally  было
+      {
+        _sendSemaphore.Release();
+      }
+
+    }
+  
 
   protected virtual async Task TrySendNextAsync()
   {

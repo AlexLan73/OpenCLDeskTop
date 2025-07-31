@@ -7,7 +7,5 @@ using MessagePack;
 
 namespace Common.Core.Property;
 
-
-
 public record CudaDtTemperature(DateTime Dt, float Temp);
 

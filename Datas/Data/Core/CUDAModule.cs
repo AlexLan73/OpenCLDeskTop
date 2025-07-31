@@ -3,17 +3,19 @@ using Common.Core.Property;
 using DMemory.Core;
 using DMemory.Core.Channel;         // Ваши MessagePack-Channel-структуры
 using DMemory.Core.Converter;       // Конвертеры Channel <-> ChannelBase
+using DMemory.Enums;
 using DynamicData;
+using DynamicData;
+using ReactiveUI;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reactive.Concurrency;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Reactive.Concurrency;
-using DynamicData;
-using ReactiveUI;
+using Windows.Media.Protection.PlayReady;
 using MapCommands = System.Collections.Generic.Dictionary<string, string>;
 
 namespace Data.Core;
@@ -21,16 +23,18 @@ namespace Data.Core;
 
 public interface ICUDAModule
 {
-  SourceCache<DataTimeVariable, ulong> Id1Temper { get; set; }
-  SourceCache<DataTimeVariable, ulong> Id2Temper { get; set; }
+  SourceCache<DataTimeVariable, long> Id1Temper { get; set; }
+  SourceCache<DataTimeVariable, long> Id2Temper { get; set; }
 }
 
 public class CUDAModule : ICUDAModule, IDisposable
 {
   // SourceCache по каждому ID (id — uint, Tik — ulong)
 //  private readonly ConcurrentDictionary<uint, SourceCache<DataTimeVariable, ulong>> _idCaches = new();
-  public SourceCache<DataTimeVariable, ulong> Id1Temper { get; set; }
-  public SourceCache<DataTimeVariable, ulong> Id2Temper { get; set; }
+  public SourceCache<DataTimeVariable, long> Id1Temper { get; set; }
+  public SourceCache<DataTimeVariable, long> Id2Temper { get; set; }
+  public SourceCache<LoggerBase, long> LoggerRx { get; set; }
+
 
   private Task _worker;
 
@@ -44,7 +48,7 @@ public class CUDAModule : ICUDAModule, IDisposable
   private readonly CancellationTokenSource _cts = new();
   private Task _inputWorker;
   private Task _outputWorker;
-
+  private Task _loopWrite;
   private readonly ServerMetaData _server;
 
   // Внешний хэндлер отправки (например, ServerMetaData.EnqueueToSendAsync)
@@ -59,11 +63,34 @@ public class CUDAModule : ICUDAModule, IDisposable
 
     Id1Temper = new(t => t.Tik);
     Id2Temper = new(t => t.Tik);
+    LoggerRx = new(t => t.Tik);
+
+    _ = LoggerRx.Connect()
+      //.Transform(transformFactory: x => new SLoggerData(ld: x))
+      //.Bind(readOnlyObservableCollection: out _lsError)
+      //        .ObserveOnDispatcher(priority: DispatcherPriority.Normal)
+      .ObserveOn(RxApp.MainThreadScheduler)
+      .Subscribe(itemChangeSet =>
+      {
+        // При каждом обновлении получаем ChangeSet<DataTimeVariable, ulong>
+        foreach (var change in itemChangeSet)
+        {
+          if (change.Reason == DynamicData.ChangeReason.Add || change.Reason == DynamicData.ChangeReason.Refresh)
+          {
+            var data = change.Current;
+            DateTimeOffset dateTime = DateTimeOffset.FromUnixTimeMilliseconds((long)data.Tik);
+            // Форматирование: "yyyy.MM.dd HH:mm:ss,fffff"
+            string formatted = dateTime.ToString("yyyy.MM.dd HH:mm:ss,fffff");
+            Console.WriteLine($"  LOGGER -->  Tik: {formatted}, Id: {data.Id} , Code: {(LoggerSendEnumMemory)data.Code}, " +
+                              $"Log= {data.Log},  Module= {data.Module}  ");
+          }
+        }
+      });
 
     _ = Id1Temper.Connect()
         //.Transform(transformFactory: x => new SLoggerData(ld: x))
         //.Bind(readOnlyObservableCollection: out _lsError)
-        .ObserveOnDispatcher(priority: DispatcherPriority.Normal)
+//        .ObserveOnDispatcher(priority: DispatcherPriority.Normal)
         .ObserveOn(RxApp.MainThreadScheduler)
         .Subscribe(itemChangeSet =>
         {
@@ -76,20 +103,35 @@ public class CUDAModule : ICUDAModule, IDisposable
               DateTimeOffset dateTime = DateTimeOffset.FromUnixTimeMilliseconds((long)data.Tik);
               // Форматирование: "yyyy.MM.dd HH:mm:ss,fffff"
               string formatted = dateTime.ToString("yyyy.MM.dd HH:mm:ss,fffff");
-              Console.WriteLine($"Новое значение Tik: {formatted}, Variable: {data.Variable}");
+              Console.WriteLine($"  ID1 --> Tik: {formatted}, Variable: {data.Variable}");
             }
           }
         });
     _ = Id2Temper.Connect()
       //      .Transform(transformFactory: x => new SLoggerData(ld: x))
       //      .Bind(readOnlyObservableCollection: out _lsError)
-      .ObserveOnDispatcher(priority: DispatcherPriority.Normal)
+//      .ObserveOnDispatcher(priority: DispatcherPriority.Normal)
       .ObserveOn(scheduler: RxApp.MainThreadScheduler)
-      .Subscribe(onNext: _ => { });
+      .Subscribe(onNext: itemChangeSet =>
+      {
+        // При каждом обновлении получаем ChangeSet<DataTimeVariable, ulong>
+        foreach (var change in itemChangeSet)
+        {
+          if (change.Reason == DynamicData.ChangeReason.Add || change.Reason == DynamicData.ChangeReason.Refresh)
+          {
+            var data = change.Current;
+            DateTimeOffset dateTime = DateTimeOffset.FromUnixTimeMilliseconds((long)data.Tik);
+            // Форматирование: "yyyy.MM.dd HH:mm:ss,fffff"
+            string formatted = dateTime.ToString("yyyy.MM.dd HH:mm:ss,fffff");
+            Console.WriteLine($"  ID2 --> Tik: {formatted}, Variable: {data.Variable}");
+          }
+        }
+      });
 
 
     _inputWorker = Task.Run(ProcessInputLoop, _cts.Token);
     _outputWorker = Task.Run(ProcessOutputLoop, _cts.Token);
+    _loopWrite = Task.Run(loopWrite, _cts.Token);
   }
 
 
@@ -113,6 +155,27 @@ public class CUDAModule : ICUDAModule, IDisposable
     await Task.CompletedTask;
   }
 
+  private void loopWrite()
+  {
+    while (true)
+    {
+      // Проверяем: нажата ли клавиша?
+      if (Console.KeyAvailable)
+      {
+        var key = Console.ReadKey(intercept: true);
+        if (key.Key == ConsoleKey.Escape)
+        {
+          Console.WriteLine("Выход из цикла по ESC.");
+          break;
+        }
+      }
+      Console.WriteLine($"Tick: {DateTime.Now:HH:mm:ss} [DcServer] -> {_server.GetSateMode()}   [ПЕРЕДАЧА] {_server.GeTransferWaiting()} ");
+
+      Thread.Sleep(500);
+    }
+
+  }
+
   // Цикл обработки входящих RamData
   private void ProcessInputLoop()
   {
@@ -122,21 +185,26 @@ public class CUDAModule : ICUDAModule, IDisposable
       {
         case var t when t == typeof(LoggerChannel):
         {
-          // передача в logger 
-          break;
+          var _logger = new LoggerChannelConverter().Convert(ram.Data) as LoggerBase;
+          if (_logger ==null) continue;
+          //            Id1Temper.AddOrUpdate(new DataTimeVariable(baseObj));
+          LoggerRx.AddOrUpdate(_logger);
+            break;
         }
         case var t when t == typeof(DtVariableChannel):
           {
             // Можно использовать твой конвертер или логику напрямую
-            if (new DtVariableChannelConverter().Convert(ram.Data) is not IDataTimeVariable baseObj) continue;
-            Id1Temper.AddOrUpdate(new DataTimeVariable(baseObj));
+            var _ddd = new DtVariableChannelConverter().Convert(ram.Data) as DataTimeVariable;
+            if (new DtVariableChannelConverter().Convert(ram.Data) is not DataTimeVariable baseObj) continue;
+//            Id1Temper.AddOrUpdate(new DataTimeVariable(baseObj));
+            Id1Temper.AddOrUpdate(_ddd);
             break;
           }
         case var t when t == typeof(VDtValuesChannel):
         {
           var baseObj = new VDtValuesChannelConverter().Convert(ram.Data) as DataTimeVariableV;
           if (baseObj == null) continue;
-          Id1Temper.AddOrUpdate(baseObj.DataTimeVariable);
+          Id2Temper.AddOrUpdate(baseObj.DataTimeVariable);
           break;
         }
 

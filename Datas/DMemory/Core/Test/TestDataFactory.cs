@@ -1,4 +1,5 @@
-﻿using System;
+﻿using DMemory.Core.Channel;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -16,7 +17,7 @@ public  class TestDataFactory
   public IdDataTimeVal CreateDtVariable(int id)
   {
     var convertedId = unchecked((uint)id);
-    var tik = (ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    var tik = (long)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     var value = _rnd.NextDouble() * (100 - 30) + 30; // от 30 до 100
     return new IdDataTimeVal(convertedId, new DataTimeValRec(tik, value));
   }
@@ -35,7 +36,7 @@ public  class TestDataFactory
     var codeValues = Enum.GetValues(typeof(LoggerSendEnumMemory));
     var code = (LoggerSendEnumMemory)codeValues.GetValue(_rnd.Next(codeValues.Length));
 
-    return new LoggerBase(convertedId, module, log, code);
+    return new LoggerBase((long)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), convertedId, module, log, code);
   }
 
   /// <summary>
@@ -48,7 +49,7 @@ public  class TestDataFactory
 
     for (int i = 0; i < variableCount; i++)
     {
-      var tik = (ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + (ulong)i * 10;
+      var tik = (long)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + (long)i * 10;
       var value = _rnd.NextDouble() * (200 - 50) + 50; // от 50 до 200
       variables[i] = new DataTimeValRec(tik, value);
     }

@@ -4,16 +4,17 @@ namespace DMemory.Core.Channel;
 
 [MessagePackObject]
 public record DtValues(
-  [property: Key(0)] ulong Tik,
+  [property: Key(0)] long Tik,
   [property: Key(1)] double Values
 );
 
 [MessagePackObject]
 public record LoggerChannel(
-  [property: Key(0)] uint Id,
-  [property: Key(1)] string Module,
-  [property: Key(2)] string Log,
-  [property: Key(3)] LoggerSendEnumMemory Code
+  [property: Key(0)] long Tik,
+  [property: Key(1)] uint Id,
+  [property: Key(2)] string Module,
+  [property: Key(3)] string Log,
+  [property: Key(4)] LoggerSendEnumMemory Code
 );
 [MessagePackObject]
 public record DtVariableChannel(

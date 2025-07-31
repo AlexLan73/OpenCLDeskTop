@@ -8,12 +8,14 @@
                  xmlns:mah="clr-namespace:MahApps.Metro.Controls;assembly=MahApps.Metro"        
                  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
                  xmlns:constants="clr-namespace:Common.Static;assembly=Common"
-                 GlowBrush="{DynamicResource MahApps.Brushes.Accent4}"                 
                  mc:Ignorable="d"
                  Title="{Binding Title}" Height="1000" Width="1600" 
                  WindowStartupLocation="CenterScreen"
                   >
-  <Window.Resources>
+    <!--  
+                 GlowBrush="{DynamicResource MahApps.Brushes.Accent4}"                 
+    -->
+    <Window.Resources>
     <ResourceDictionary>
       <ResourceDictionary.MergedDictionaries>
         <ResourceDictionary Source="pack://application:,,,/Common;component/Resource/Styles0.xaml" />

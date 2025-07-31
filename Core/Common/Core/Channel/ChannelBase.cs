@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Common.Core.Property;
 
 namespace Common.Core.Channel;
 public class ChannelBase
@@ -18,8 +19,7 @@ public enum LoggerSendEnumMemory
 }
 
 
-public record LoggerBase(uint Id, string Module, string Log, LoggerSendEnumMemory Code);
-//public record IdDataTimeVal(uint Id, ulong Tic, double Variable);
+public record LoggerBase(long Tik, uint Id, string Module, string Log, LoggerSendEnumMemory Code);
 public record IdDataTimeVal(uint Id, DataTimeValRec Variable);
 public record VIdDataTimeVal(uint Id, DataTimeValRec[] Variables);
 
