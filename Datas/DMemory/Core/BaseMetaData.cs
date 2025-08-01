@@ -376,21 +376,46 @@ public abstract class BaseMetaData : IDisposable
           return;
         }
       case SateMode.Initialization when (_timer.GetInitialization() % 5 == 1):
-        {
-          // время вышло связи нет переходим на начальный уровень
-          //      _mode = SateMode.Initialization;
-          _transferWaiting = TransferWaiting.None;
+      {
+        // Пропускаем resetInitialization, если надо - добавить
 
-          _timer.ResetWork();
-          //      ResetInitialization();
-          var initAck = new MapCommands
+        _transferWaiting = TransferWaiting.None;
+        _timer.ResetWork();
+
+        var currentMap = Md?.PeekMetaMap();
+
+        if (currentMap != null)
+        {
+          if (currentMap.TryGetValue(MdCommand.State.AsKey(), out var stateVal)
+              && stateVal != _nameModule
+              && currentMap.TryGetValue(MdCommand.Command.AsKey(), out var commandVal)
+              && commandVal == "_")
           {
-            [MdCommand.State.AsKey()] = _nameModule,
-            [MdCommand.Command.AsKey()] = "_"
-          };
-          Md.WriteMetaMap(initAck);
-          return;
+            // Переходим в режим работы
+            _mode = SateMode.Work;
+
+            // Формируем acknowledgement — аккуратнее поставить значение, а не ключ!
+            var ack = new MapCommands
+            {
+              [MdCommand.State.AsKey()] = _nameModule,
+              [MdCommand.Command.AsKey()] = MdCommand.Ok.AsKey() // Вероятно, имелось в виду "Ok"
+            };
+
+            Md.WriteMetaMap(ack);
+            return;
+          }
         }
+
+        // Если условия не сработали — отправляем пустой handshake "_"
+        var initAck = new MapCommands
+        {
+          [MdCommand.State.AsKey()] = _nameModule,
+          [MdCommand.Command.AsKey()] = "_"
+        };
+        Md?.WriteMetaMap(initAck);
+        return;
+      }
+
       case SateMode.Work when _timer.GetWorkSendCount() > _timer._CompelWorkSendCount:
         {
           _mode = SateMode.Initialization;

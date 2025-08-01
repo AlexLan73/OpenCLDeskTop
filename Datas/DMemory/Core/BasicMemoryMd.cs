@@ -1,8 +1,14 @@
-﻿using MapCommands = System.Collections.Generic.Dictionary<string, string>;
+﻿using Windows.ApplicationModel.Store;
+using MapCommands = System.Collections.Generic.Dictionary<string, string>;
 
 namespace DMemory.Core;
 
-public class BasicMemoryMd : IDisposable
+public interface IMemoryMdPeekable
+{
+  MapCommands? PeekMetaMap();
+}
+
+public class BasicMemoryMd : IMemoryMdPeekable, IDisposable
 {
   private readonly MemoryMappedFile _mmf;
   private readonly EventWaitHandle _event;
@@ -77,15 +83,56 @@ public class BasicMemoryMd : IDisposable
   }
   public static string ConvertDictToString(MapCommands dic)
     => dic == null || dic.Count == 0 ? null : string.Join(";", dic.Select(x => $"{x.Key}={x.Value}")) + ";";
-
+  /*
+    public static MapCommands ConvertStringToDict(string str)
+      => string.IsNullOrWhiteSpace(str)
+        ? null
+        : str.Split(';', StringSplitOptions.RemoveEmptyEntries)
+          .Select(s => s.Split('=', 2, StringSplitOptions.RemoveEmptyEntries))
+          .Where(parts => parts.Length == 2)
+          .ToDictionary(parts => parts[0], parts => parts[1]);
+    */
   public static MapCommands ConvertStringToDict(string str)
-    => string.IsNullOrWhiteSpace(str)
-      ? null
-      : str.Split(';', StringSplitOptions.RemoveEmptyEntries)
-        .Select(s => s.Split('=', 2, StringSplitOptions.RemoveEmptyEntries))
-        .Where(parts => parts.Length == 2)
-        .ToDictionary(parts => parts[0], parts => parts[1]);
+  {
+    if (string.IsNullOrWhiteSpace(str))
+      return null;
 
+    var result = new Dictionary<string, string>();
+    var seenKeys = new HashSet<string>();
+    var sections = str.Split(';', StringSplitOptions.RemoveEmptyEntries);
+
+    foreach (var section in sections)
+    {
+      var parts = section.Split('=', 2, StringSplitOptions.RemoveEmptyEntries);
+      if (parts.Length != 2)
+        continue; // malformed
+
+      var key = parts[0];
+      if (!seenKeys.Add(key))
+      {
+        // Коллизия — возвращаем пустой словарь
+        return new Dictionary<string, string>();
+      }
+      result.Add(key, parts[1]);
+    }
+    return result;
+  }
+
+  public MapCommands? PeekMetaMap()
+  {
+    lock (_syncLock)
+    {
+      using var accessor = _mmf.CreateViewAccessor();
+      var buffer = new byte[_size];
+      accessor.ReadArray(0, buffer, 0, buffer.Length);
+      var result = Encoding.UTF8.GetString(buffer).TrimEnd('\0');
+      var map = ConvertStringToDict(result);
+      if (map != null && map.Count != 0) return map;
+      // Очистить память, т.к. был дубль ключа или пустое содержимое
+      accessor.WriteArray(0, new byte[_size], 0, _size);
+      return null;
+    }
+  }
   public void Dispose()
   {
     _cts?.Cancel();
