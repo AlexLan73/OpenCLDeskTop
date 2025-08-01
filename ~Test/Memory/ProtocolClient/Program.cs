@@ -98,7 +98,7 @@ while (true)
     }
   }
 
-  Thread.Sleep(100);
+  Thread.Sleep(973);
   count++;
 }
 
@@ -125,7 +125,7 @@ DtVariableChannel CreateDtVariableChannel(int id)
 void HandleReceivedData(RamData data)
 {
   // Логика обработки данных сверху
-  Console.WriteLine($"[CLIENT]  Received data of type: {data.DataType.Name}");
+  Console.WriteLine($"[CLIENT !!!! ]  Received data of type: {data.DataType.Name}");
   // Например обработать данные, передать дальше и т.п.
 //  Console.WriteLine($"Id: {example.Id}, Tik: {example.Values.Tik}, Value: {example.Values.Values:F2}");
 }

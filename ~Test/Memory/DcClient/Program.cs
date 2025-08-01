@@ -66,26 +66,26 @@ while (true)
 
           }
     */
-
+    _isSnd = false;
     if (_isSnd)
     {
       int ind = count % 4;
       RamData ramData = null;
       switch (ind)
       {
-        case 1:
+        case 10:
           {
             var x = _test.CreateDtVariable(count);
             ramData = new RamData(x, typeof(IdDataTimeVal), new MapCommands());
             break;
           }
-        case 2:
+        case 20:
           {
             var x = _test.CreateVDtValues(count, 10);
             ramData = new RamData(x, typeof(VIdDataTimeVal), new MapCommands());
             break;
           }
-        case 3:
+        case 30:
           {
             var x = _test.CreateLoggerBase(count);
             ramData = new RamData(x, typeof(LoggerBase), new MapCommands());
@@ -99,7 +99,7 @@ while (true)
     }
   }
 
-  Thread.Sleep(100);
+  Thread.Sleep(1500);
   count++;
 }
 
