@@ -374,36 +374,32 @@ public abstract class BaseMetaData : IDisposable
         }
       case SateMode.Initialization when (_timer.GetInitialization() % 5 == 1):
       {
-        // Пропускаем resetInitialization, если надо - добавить
-
+        // Сброс ожидания и таймера — нет связи
         _transferWaiting = TransferWaiting.None;
         _timer.ResetWork();
 
+        // Пытаемся прочитать метаданные из памяти (без удаления)
         var currentMap = Md?.PeekMetaMap();
 
-        if (currentMap != null)
+        // Проверка: чужое состояние и входящий "reset" — уходим в Work
+        if (currentMap != null &&
+            currentMap.TryGetValue(MdCommand.State.AsKey(), out var stateVal) &&
+            stateVal != _nameModule &&
+            currentMap.TryGetValue(MdCommand.Command.AsKey(), out var cmdVal) &&
+            cmdVal == "_")
         {
-          if (currentMap.TryGetValue(MdCommand.State.AsKey(), out var stateVal)
-              && stateVal != _nameModule
-              && currentMap.TryGetValue(MdCommand.Command.AsKey(), out var commandVal)
-              && commandVal == "_")
+          // Переход в режим работы и отправка ACK ("Ok") обратно
+          _mode = SateMode.Work;
+          var ack = new MapCommands
           {
-            // Переходим в режим работы
-            _mode = SateMode.Work;
-
-            // Формируем acknowledgement — аккуратнее поставить значение, а не ключ!
-            var ack = new MapCommands
-            {
-              [MdCommand.State.AsKey()] = _nameModule,
-              [MdCommand.Command.AsKey()] = MdCommand.Ok.AsKey() // Вероятно, имелось в виду "Ok"
-            };
-
-            Md.WriteMetaMap(ack);
-            return;
-          }
+            [MdCommand.State.AsKey()] = _nameModule,
+            [MdCommand.Command.AsKey()] = MdCommand.Ok.AsKey()
+          };
+          Md.WriteMetaMap(ack);
+          return;
         }
 
-        // Если условия не сработали — отправляем пустой handshake "_"
+        // Если не сработало — отправляем инициализацию (наш "reset")
         var initAck = new MapCommands
         {
           [MdCommand.State.AsKey()] = _nameModule,
@@ -413,6 +409,48 @@ public abstract class BaseMetaData : IDisposable
         return;
       }
 
+      /*
+            case SateMode.Initialization when (_timer.GetInitialization() % 5 == 1):
+            {
+              // Пропускаем resetInitialization, если надо - добавить
+
+              _transferWaiting = TransferWaiting.None;
+              _timer.ResetWork();
+
+              var currentMap = Md?.PeekMetaMap();
+
+              if (currentMap != null)
+              {
+                if (currentMap.TryGetValue(MdCommand.State.AsKey(), out var stateVal)
+                    && stateVal != _nameModule
+                    && currentMap.TryGetValue(MdCommand.Command.AsKey(), out var commandVal)
+                    && commandVal == "_")
+                {
+                  // Переходим в режим работы
+                  _mode = SateMode.Work;
+
+                  // Формируем acknowledgement — аккуратнее поставить значение, а не ключ!
+                  var ack = new MapCommands
+                  {
+                    [MdCommand.State.AsKey()] = _nameModule,
+                    [MdCommand.Command.AsKey()] = MdCommand.Ok.AsKey() // Вероятно, имелось в виду "Ok"
+                  };
+
+                  Md.WriteMetaMap(ack);
+                  return;
+                }
+              }
+
+              // Если условия не сработали — отправляем пустой handshake "_"
+              var initAck = new MapCommands
+              {
+                [MdCommand.State.AsKey()] = _nameModule,
+                [MdCommand.Command.AsKey()] = "_"
+              };
+              Md?.WriteMetaMap(initAck);
+              return;
+            }
+      */
       case SateMode.Work when _timer.GetWorkSendCount() > _timer._CompelWorkSendCount:
         {
           _mode = SateMode.Initialization;

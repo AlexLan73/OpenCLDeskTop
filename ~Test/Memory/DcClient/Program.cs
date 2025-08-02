@@ -39,7 +39,8 @@ while (true)
    */
   //  Console.WriteLine($"Tick: {DateTime.Now:HH:mm:ss}  &  count {count}");
   //  Console.WriteLine($"STATE MODE");
-  Console.WriteLine($"[Client] -> {client.GetSateMode()}   [ПЕРЕДАЧА] {client.GeTransferWaiting()} ");
+  if (client.GetSateMode() != SateMode.Work || client.GeTransferWaiting() == TransferWaiting.None)
+    Console.WriteLine($"[Client] -> {client.GetSateMode()}   [ПЕРЕДАЧА] {client.GeTransferWaiting()} ");
   //    Console.WriteLine($"[Client] -> {client.GetSateMode()}   {client.GeTransferWaiting()} ");
 
   if (client.GetSateMode() == SateMode.Work && client.GeTransferWaiting() == TransferWaiting.Transfer)
@@ -66,26 +67,26 @@ while (true)
 
           }
     */
-    _isSnd = false;
+    _isSnd = true;
     if (_isSnd)
     {
       int ind = count % 4;
       RamData ramData = null;
       switch (ind)
       {
-        case 10:
+        case 1:
           {
             var x = _test.CreateDtVariable(count);
             ramData = new RamData(x, typeof(IdDataTimeVal), new MapCommands());
             break;
           }
-        case 20:
+        case 2:
           {
             var x = _test.CreateVDtValues(count, 10);
             ramData = new RamData(x, typeof(VIdDataTimeVal), new MapCommands());
             break;
           }
-        case 30:
+        case 3:
           {
             var x = _test.CreateLoggerBase(count);
             ramData = new RamData(x, typeof(LoggerBase), new MapCommands());
@@ -99,7 +100,7 @@ while (true)
     }
   }
 
-  Thread.Sleep(1500);
+  Thread.Sleep(500);
   count++;
 }
 
@@ -126,7 +127,7 @@ DtVariableChannel CreateDtVariableChannel(int id)
 void HandleReceivedData(RamData data)
 {
   // Логика обработки данных сверху
-  Console.WriteLine($"[CLIENT]  Received data of type: {data.DataType.Name}");
+  Console.WriteLine($"[CLIENT] {DateTime.Now:HH:mm:ss,ffff}   Received data of type: {data.DataType.Name}");
   // Например обработать данные, передать дальше и т.п.
   //  Console.WriteLine($"Id: {example.Id}, Tik: {example.Values.Tik}, Value: {example.Values.Values:F2}");
 }

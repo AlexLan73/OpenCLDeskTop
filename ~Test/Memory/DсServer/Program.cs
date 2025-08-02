@@ -8,7 +8,7 @@ using MapCommands = System.Collections.Generic.Dictionary<string, string>;
 Console.WriteLine("Запуск в DataContext  CUDAModule ");
 Console.WriteLine(" Test на прием данных от С++  и пересылка управляющих данных в С++ ");
 
-var _cudaServer = new CUDAModule();
+var _cudaServer = new CudaModule();
 var _test = new TestDataFactory();
 
 int count=0;
@@ -25,7 +25,7 @@ while (true)
       break;
     }
   }
-  Console.WriteLine($" DsProg--->  {DateTime.Now:HH:mm:ss} [DcServer] ");
+//  Console.WriteLine($" DsProg--->  {DateTime.Now:HH:mm:ss} [DcServer] ");
 
   if (_isSnd)
   {
@@ -59,7 +59,7 @@ while (true)
   }
 
 
-  Thread.Sleep(973);
+  Thread.Sleep(500);
   count++;
 
 }
