@@ -75,15 +75,14 @@ public class CUDAModule : ICUDAModule, IDisposable
         // При каждом обновлении получаем ChangeSet<DataTimeVariable, ulong>
         foreach (var change in itemChangeSet)
         {
-          if (change.Reason == DynamicData.ChangeReason.Add || change.Reason == DynamicData.ChangeReason.Refresh)
-          {
-            var data = change.Current;
-            DateTimeOffset dateTime = DateTimeOffset.FromUnixTimeMilliseconds((long)data.Tik);
-            // Форматирование: "yyyy.MM.dd HH:mm:ss,fffff"
-            string formatted = dateTime.ToString("yyyy.MM.dd HH:mm:ss,fffff");
-            Console.WriteLine($"  LOGGER -->  Tik: {formatted}, Id: {data.Id} , Code: {(LoggerSendEnumMemory)data.Code}, " +
-                              $"Log= {data.Log},  Module= {data.Module}  ");
-          }
+          if (change.Reason != DynamicData.ChangeReason.Add &&
+              change.Reason != DynamicData.ChangeReason.Refresh) continue;
+          var data = change.Current;
+          var dateTime = DateTimeOffset.FromUnixTimeMilliseconds((long)data.Tik);
+          // Форматирование: "yyyy.MM.dd HH:mm:ss,fffff"
+          var formatted = dateTime.ToString("yyyy.MM.dd HH:mm:ss,fffff");
+          Console.WriteLine($"  LOGGER -->  Tik: {formatted}, Id: {data.Id} , Code: {(LoggerSendEnumMemory)data.Code}, " +
+                            $"Log= {data.Log},  Module= {data.Module}  ");
         }
       });
 
@@ -235,6 +234,7 @@ public class CUDAModule : ICUDAModule, IDisposable
       }
       else
       {
+        _server.EnqueueToSendAsync(ram);
         Console.WriteLine("[CUDAModule] Не назначен обработчик для отправки RamData!");
       }
     }

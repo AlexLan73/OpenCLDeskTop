@@ -29,8 +29,8 @@ while (true)
 
   if (_isSnd)
   {
-    int ind = count % 4;
-    RamData ramData = null;
+    var ind = count % 4;
+    RamData? ramData = null;
     switch (ind)
     {
       case 10:
