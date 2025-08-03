@@ -190,7 +190,7 @@ public class CudaModule : ICudaModule, IDisposable
         Console.WriteLine("Выход из цикла по ESC.");
         break;
       }
-      if(_server.GetSateMode() != SateMode.Work || _server.GeTransferWaiting() == TransferWaiting.None)
+//      if(_server.GetSateMode() != SateMode.Work || _server.GeTransferWaiting() == TransferWaiting.None)
           Console.WriteLine($"Tick: {DateTime.Now:HH:mm:ss} [DcServer] -> {_server.GetSateMode()} [ПЕРЕДАЧА] {_server.GeTransferWaiting()} ");
       Thread.Sleep(500);
     }

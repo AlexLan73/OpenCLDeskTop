@@ -25,8 +25,9 @@ while (true)
       break;
     }
   }
-//  Console.WriteLine($" DsProg--->  {DateTime.Now:HH:mm:ss} [DcServer] ");
+  //  Console.WriteLine($" DsProg--->  {DateTime.Now:HH:mm:ss} [DcServer] ");
 
+  _isSnd= false;
   if (_isSnd)
   {
     var ind = count % 4;
@@ -59,7 +60,7 @@ while (true)
   }
 
 
-  Thread.Sleep(500);
+  Thread.Sleep(1000);
   count++;
 
 }
