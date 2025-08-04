@@ -101,8 +101,8 @@ public class CudaModule : ICudaModule, IDisposable
           if (logger != null) LoggerRx.AddOrUpdate(logger);
           break;
 
-        case var t when t == typeof(DtVariableChannel):
-          var baseObj = new DtVariableChannelConverter().Convert(ram.Data) as DataTimeVariable;
+        case var t when t == typeof(DtValuesChannel):
+          var baseObj = new DtValuesChannelConverter().Convert(ram.Data) as DataTimeVariable;
           if (baseObj != null) Id1Temper.AddOrUpdate(baseObj);
           break;
 
@@ -392,11 +392,11 @@ public class CUDAModule : ICUDAModule, IDisposable
           LoggerRx.AddOrUpdate(_logger);
             break;
         }
-        case var t when t == typeof(DtVariableChannel):
+        case var t when t == typeof(DtValuesChannel):
           {
             // Можно использовать твой конвертер или логику напрямую
-            var _ddd = new DtVariableChannelConverter().Convert(ram.Data) as DataTimeVariable;
-            if (new DtVariableChannelConverter().Convert(ram.Data) is not DataTimeVariable baseObj) continue;
+            var _ddd = new DtValuesChannelConverter().Convert(ram.Data) as DataTimeVariable;
+            if (new DtValuesChannelConverter().Convert(ram.Data) is not DataTimeVariable baseObj) continue;
 //            Id1Temper.AddOrUpdate(new DataTimeVariable(baseObj));
             Id1Temper.AddOrUpdate(_ddd);
             break;

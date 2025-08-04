@@ -17,7 +17,7 @@ public record LoggerChannel(
   [property: Key(4)] LoggerSendEnumMemory Code
 );
 [MessagePackObject]
-public record DtVariableChannel(
+public record DtValuesChannel(
   [property: Key(0)] uint Id,
   [property: Key(1)] DtValues Values
 );

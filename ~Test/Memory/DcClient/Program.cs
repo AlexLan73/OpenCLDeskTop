@@ -61,7 +61,7 @@ while (true)
                   //_isSnd = false;
           Console.WriteLine($" [Client] ->    Tick: {DateTime.Now:HH:mm:ss}  &  count {count}");
             var x = CreateDtVariableChannel(count);
-            var ramData = new RamData(x, typeof(DtVariableChannel), new MapCommands());
+            var ramData = new RamData(x, typeof(DtValuesChannel), new MapCommands());
      //       var ramData1 = new RamData(null, null, new MapCommands());
             await client.EnqueueToSendAsync(ramData);
 
@@ -109,7 +109,7 @@ client.Dispose();
 //await Task.WhenAll(client.WaiteEvent);
 
 // Метод генерации одного экземпляра с заданным int id
-DtVariableChannel CreateDtVariableChannel(int id)
+DtValuesChannel CreateDtVariableChannel(int id)
 {
   var rnd = new Random();
 
@@ -119,7 +119,7 @@ DtVariableChannel CreateDtVariableChannel(int id)
 
   double value = rnd.NextDouble() * (100 - 30) + 30; // случайное double от 30 до 100
 
-  return new DtVariableChannel(
+  return new DtValuesChannel(
     convertedId,
     new DtValues(tik, value)
   );

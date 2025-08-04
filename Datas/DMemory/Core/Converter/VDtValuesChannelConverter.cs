@@ -73,14 +73,14 @@ public class VDtValuesToChannelConverter : IBaseToChannelConverter
 /*
 VectorIdBase
 
-public class DtVariableChannelConverter : IChannelConverter
+public class DtValuesChannelConverter : IChannelConverter
    {
-     public Type SourceType => typeof(DtVariableChannel);
+     public Type SourceType => typeof(DtValuesChannel);
      public Type TargetType => typeof(DTVariable);
    
      public object Convert(object channelObject)
      {
-       var src = channelObject as DtVariableChannel;
+       var src = channelObject as DtValuesChannel;
        return new DTVariable(src.Id, src.Values.Tik, src.Values.Values);
      }
    }
