@@ -102,7 +102,7 @@ public class CudaModule : ICudaModule, IDisposable
           break;
 
         case var t when t == typeof(DtValuesChannel):
-          var baseObj = new DtValuesChannelConverter().Convert(ram.Data) as DataTimeVariable;
+          var baseObj = new DtVariableChannelConverter().Convert(ram.Data) as DataTimeVariable;
           if (baseObj != null) Id1Temper.AddOrUpdate(baseObj);
           break;
 
