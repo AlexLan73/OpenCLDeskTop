@@ -41,7 +41,7 @@ namespace DMemory.Core {
 
     private  List<IChannelConverter> GetConverters()=>
     [
-      new DtVariableChannelConverter(),
+      new DtValuesChannelConverter(),
       new VDtValuesChannelConverter(),
       new LoggerChannelConverter()
       // другие по мере необходимости

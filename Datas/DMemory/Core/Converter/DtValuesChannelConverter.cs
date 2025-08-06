@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace DMemory.Core.Converter;
 
-public class DtVariableChannelConverter : IChannelConverter
+public class DtValuesChannelConverter : IChannelConverter
 {
   public Type SourceType => typeof(DtValuesChannel);
   public Type TargetType => typeof(DataTimeVariable);
@@ -21,7 +21,7 @@ public class DtVariableChannelConverter : IChannelConverter
 }
 
 /*
-public class DtVariableChannelConverter : IChannelConverter
+public class DtValuesChannelConverter : IChannelConverter
 {
   public Type SourceType => typeof(DtValuesChannel);
   public Type TargetType => typeof(Common.Core.Channel.IdDataTimeVal);
