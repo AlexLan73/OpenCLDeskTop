@@ -9,6 +9,7 @@ public static class MdCommandExtensions
 {
   public static string AsKey(this MdCommand cmd) => cmd switch
   {
+    MdCommand.None => "",
     MdCommand.State => "state",
     MdCommand.Command => "command",
     MdCommand.Work => "work",
