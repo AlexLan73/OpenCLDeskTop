@@ -39,6 +39,7 @@ public class CudaModule : ICudaModule, IDisposable
   private readonly Task _inputWorker;
   private readonly Task _outputWorker;
   private Task _loopWrite;
+  private bool _isProcessInputLoop = false;
 
   //  В DataContext -> CUDAModule -> всегда сервер
   private readonly ServerMetaData _server;
@@ -71,7 +72,11 @@ public class CudaModule : ICudaModule, IDisposable
   /// <summary>
   /// Внешний приём RamData — кладём в очередь (потоко-безопасно, никогда не теряем данные)
   /// </summary>
-  public void EnqueueRaw(RamData data) => _inputQueue.Add(data);
+  public void EnqueueRaw(RamData data)
+  {
+    _inputQueue.Add(data);
+    ProcessInputLoop();
+  }
 
   /// <summary>
   /// Положить данные в очередь на отправку в DMemory (back channel)
@@ -92,28 +97,59 @@ public class CudaModule : ICudaModule, IDisposable
   /// </summary>
   private void ProcessInputLoop()
   {
+    if(_isProcessInputLoop)  return;
+    _isProcessInputLoop = true;
     foreach (var ram in _inputQueue.GetConsumingEnumerable(_cts.Token))
     {
       switch (ram.DataType)
       {
         case var t when t == typeof(LoggerChannel):
+        {
           var logger = new LoggerChannelConverter().Convert(ram.Data) as LoggerBase;
           if (logger != null) LoggerRx.AddOrUpdate(logger);
+          Console.WriteLine($"LoggerChannel за memory  {ram.Data} ");
           break;
-
+        }
+        case var t when t == typeof(LoggerChannel[]):
+        {
+//          var logger = new LoggerChannelConverter().Convert(ram.Data) as LoggerBase;
+//          if (logger != null) LoggerRx.AddOrUpdate(logger);
+          Console.WriteLine($"LoggerChannel[] за memory  {ram.Data} ");
+          break;
+        }
         case var t when t == typeof(DtValuesChannel):
+        {
           var baseObj = new DtValuesChannelConverter().Convert(ram.Data) as DataTimeVariable;
           if (baseObj != null) Id1Temper.AddOrUpdate(baseObj);
+          Console.WriteLine($"DtValuesChannel  {ram.Data} ");
           break;
-
+        }
+        case var t when t == typeof(DtValuesChannel[]):
+        {
+//          var baseObj = new DtValuesChannelConverter().Convert(ram.Data) as DataTimeVariable;
+//          if (baseObj != null) Id1Temper.AddOrUpdate(baseObj);
+          Console.WriteLine($"DtValuesChannel[]  {ram.Data} ");
+          break;
+        }
         case var t when t == typeof(VDtValuesChannel):
+        {
           var vObj = new VDtValuesChannelConverter().Convert(ram.Data) as DataTimeVariableV;
           if (vObj != null) Id2Temper.AddOrUpdate(vObj.DataTimeVariable);
+          Console.WriteLine($"VDtValuesChannel  {ram.Data} ");
           break;
-
-          // Добавляй другие типы данных по мере необходимости
+        }
+        case var t when t == typeof(VDtValuesChannel[]):
+        {
+//          var vObj = new VDtValuesChannelConverter().Convert(ram.Data) as DataTimeVariableV;
+//          if (vObj != null) Id2Temper.AddOrUpdate(vObj.DataTimeVariable);
+          Console.WriteLine($"VDtValuesChannel[]  {ram.Data} ");
+          break;
+        }
+        // Добавляй другие типы данных по мере необходимости
       }
     }
+    _isProcessInputLoop = false;
+
   }
 
   /// <summary>
