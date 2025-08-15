@@ -67,7 +67,7 @@ public abstract class BaseMetaData : IDisposable
   ];
 
   // Теперь поддерживаем возможность передачи только MD-команд (data/dataType == null)
-  /*
+  
   public async Task EnqueueToSendAsync(RamData data)
   {
     if (data.Data != null && data.DataType != null)
@@ -90,9 +90,8 @@ public abstract class BaseMetaData : IDisposable
       _sendSemaphore.Release();
     }
   }
-  */
-
-
+  
+/*
   public async Task EnqueueToSendAsync(RamData data)
   {
     if (data.Data != null && data.DataType != null)
@@ -134,7 +133,7 @@ public abstract class BaseMetaData : IDisposable
     }
 
   }
-
+  */
   protected virtual async Task TrySendNextAsync()
   {
     if (!_txQueue.TryDequeue(out var data)) return;
@@ -150,7 +149,6 @@ public abstract class BaseMetaData : IDisposable
       // Освобождение семафора будет только в OnMetaReady, чтобы не было гонки!
     }
   }
-
   protected virtual void OnMetaReady(object sender, MapCommands meta)
   {
     // Здесь мы освобождаем семафор для следующих команд или передачи
@@ -169,7 +167,6 @@ public abstract class BaseMetaData : IDisposable
     _processor.CommitWrite();
     Md.WriteMetaMap(_metadataSend);
   }
-
   protected virtual void CallBackMetaData(MapCommands map)
   {
     if (map == null || map.Count == 0) return;
@@ -186,7 +183,6 @@ public abstract class BaseMetaData : IDisposable
       default: throw new ArgumentOutOfRangeException();
     }
   }
-
   protected virtual void HandleInitialization(MapCommands map)
   {
     if (map.TryGetValue(MdCommand.Command.AsKey(), out var cmdVal))
@@ -222,7 +218,6 @@ public abstract class BaseMetaData : IDisposable
     Md.WriteMetaMap(initAck);
     Console.WriteLine($">>> [{_nameModule}] Sent empty command");
   }
-
   protected virtual void HandleWork(MapCommands map)
   {
     if (map.Count < 1) return;
@@ -251,14 +246,14 @@ public abstract class BaseMetaData : IDisposable
       }
       map.Remove(MdCommand.Command.AsKey());
     }
-    // --- Data branch
-    if (map.TryGetValue(MdCommand.Data.AsKey(), out var dataVal) || map.TryGetValue(MdCommand.Control.AsKey(), out var controlVal))
-    {
 
+    // ===>>>  --- Data branch   <<<===
+    if (map.TryGetValue(MdCommand.Data.AsKey(), out var dataVal) 
+        || map.TryGetValue(MdCommand.Control.AsKey(), out var controlVal))
+    {
       //      var dataMap = string.IsNullOrEmpty(dataVal)? (string.IsNullOrEmpty(controlVal)? null: controlVal) : dataVal;// !=null? dataVal: controlVal!=null? controlVal:;
       //      var dataMap = string.IsNullOrEmpty(dataVal)
       //        ? (string.IsNullOrEmpty(controlVal) ? null : controlVal): dataVal;
-
       bool hasData = map.TryGetValue(MdCommand.Data.AsKey(), out dataVal);
       bool hasControl = map.TryGetValue(MdCommand.Control.AsKey(), out controlVal);
 
@@ -308,17 +303,13 @@ public abstract class BaseMetaData : IDisposable
             }
         }
       }
-
       map.Remove(MdCommand.Data.AsKey());
     }
 
     if (map.TryGetValue(MdCommand.Control.AsKey(), out var controlValur))
-    {
-
-
       map.Remove(MdCommand.Control.AsKey());
-    }
-    // --- Отладочные и лишние ключи
+
+    // =====>>>> --- Отладочные и лишние ключи  <<<======
     if (map.Count > 0)
     {
       var keysToRemove = new List<string>();
