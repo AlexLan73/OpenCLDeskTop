@@ -33,7 +33,7 @@ public abstract class BaseMetaData : IDisposable
     _processor.MetaReady += OnMetaReady;
     _baseToChannelConverters = GetToChannelConverters;
     //  Таймеры инициализации — как в исходных файлах
-/*    
+
     SystemPulseTimer.On250MilSec += () =>
     {
       if (_mode == SateMode.Work)
@@ -51,7 +51,7 @@ public abstract class BaseMetaData : IDisposable
     };
     SystemPulseTimer.On5Seconds += () => { _timer._timeGeneralWork = _timer.IncGeneralWork(); };
     SystemPulseTimer.Start();
-*/
+
 
     // "Рукопожатие" — отправка начального ack
     var initAck = new MapCommands { [MdCommand.State.AsKey()] = _nameModule };
